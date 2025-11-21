@@ -52,8 +52,9 @@ nrow(tot)
 
 write.table(tot,"points_selected_in_Soil_Grassland_LF.csv",sep=",",quote=F,row.names=F)
 
-130000 - nrow(tot)
-# [1] 27702
+remaining <- 130000 - nrow(tot)
+remaining
+# [1] 18500
 
 load("master_complete.RData")
 
@@ -81,7 +82,6 @@ round(prop.table(table(tot$LC_pred)),5)
 # Allocate 27,702 points to align LC_pred distribution (base R)
 # ---------------------------
 
-remaining <- 27702L
 target_total <- nrow(tot) + remaining
 
 # Target proportions from master_tot
@@ -218,7 +218,7 @@ xg <- colMeans(bp)
 lines(xg, prop_final, type = "b", lwd = 3, col = "red")
 
 # X-axis labels (categories)
-axis(1, at = xg, labels = cats, las = 2, tick = FALSE)
+axis(1, at = xg, labels = cats, las = 1, tick = FALSE)
 
 # Combined legend (bars + red line)
 legend("topright",

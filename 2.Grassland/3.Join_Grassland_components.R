@@ -16,7 +16,7 @@ setwd("D:/Google Drive/LUCAS 2026/dati")
 # --- Load and harmonize component 1 ---
 comp1 <- read.csv("Grassland2027_component1.csv")
 comp1b <- NULL
-comp1b$POINT_ID <- comp1$ID
+comp1b$POINT_ID <- comp1$POINT_ID
 comp1b$component <- "component1"
 comp1b$STRATUM <- comp1$STRATUM_GRASSLAND
 comp1b$WGT_LUCAS <- comp1$WGT_LUCAS 

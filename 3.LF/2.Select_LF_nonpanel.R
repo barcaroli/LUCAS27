@@ -16,7 +16,7 @@
 
 # ---- Setup environment ------------------------------------------------
 setwd("D:/Google Drive/LUCAS 2026/dati")
-library(data.table)
+# library(data.table)
 
 # ---- Load master frame and derive LF eligibility ---------------------
 # Read master

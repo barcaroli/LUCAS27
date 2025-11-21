@@ -29,6 +29,7 @@ soil22obs <- soil22[soil22$ID %in% points$POINT_ID_Soil.Standard | soil22$ID %in
 soil22obs <- merge(soil22obs,lucas22[,c("POINT_ID","LC1")],by.x="ID",by.y="POINT_ID")
 soil22obs <- soil22obs[soil22obs$LC1 %in% c("B","C","E","H"),]
 nrow(soil22obs)
+# [1] 28046
 # ---- Apply the exclusion lists ----
 # Exclusion of points (5959)
 excl <- read.xlsx("Soil_to_be_removed.xlsx")
