@@ -23,6 +23,8 @@ lucas22$LCobs <- substr(lucas22$SURVEY_LC1,1,1)
 lucas22$LUobs <- substr(lucas22$SURVEY_LU1,1,3)
 library(openxlsx)
 
+load("master_complete.RData")
+
 # ---- Load LF subsample inputs ----------------------------------------
 # Read observed points in module sub-samples
 points <- read.xlsx("effective_points_modules.xlsx")
@@ -33,11 +35,20 @@ LF22 <- read.csv2("LF_sample_2022.csv",dec=".")
 # Select actually observed points
 # N.B.: ask for the difference betweeen Standard and Bulk, and if we can use them all or not
 LF22obs <- LF22[LF22$ID %in% points$POINT_ID_LF,]
+LF22obs <- merge(LF22obs,master_tot[,c("POINT_ID","STR25")],by.x="ID",by.y="POINT_ID")
 # Select actually observed points in "E" and "D"
 LF22obs <- merge(LF22obs,lucas22[,c("POINT_ID","LCobs","LUobs")],by.x="ID",by.y="POINT_ID")
-LF22obs <- LF22obs[LF22obs$LCobs %in% c("B","E") | LF22obs$LUobs == "U11",]        # Check this!
-nrow(LF22obs)
-# [1] 79546
+# LF22obs1 <- LF22obs[(LF22obs$LUobs == "U11" & LF22obs$LCobs == "E") | (LF22obs$LCobs == "B"),] 
+LF22obs1 <- LF22obs[(LF22obs$LUobs == "U11" & LF22obs$STR25 == 3) | (LF22obs$STR25 %in% c(1,2)),] 
+nrow(LF22obs1)
+# [1] 64089
+# (LU11 = 1 AND STR25=3) OR (STR25=1,2)
+# LF22obs2 <- LF22obs[LF22obs$LCobs %in% c("B","E") | LF22obs$LUobs == "U11",]  
+# LF22obs2 <- LF22obs[(LF22obs$LUobs == "U11") | (LF22obs$STR25 %in% c(1,2,3)),]
+# nrow(LF22obs2)
+# [1] 78318
+
+LF22obs <- LF22obs1
 
 # ---- Calibrate weights within LF strata -------------------------------
 # Calculate calibrated weights
@@ -97,19 +108,40 @@ stratum_counts <- aggregate(rep(1, nrow(LF22obs)),
                             FUN = sum)
 colnames(stratum_counts)[colnames(stratum_counts) == "x"] <- "n_in_stratum"
 stratum_counts$target_n <- stratum_counts$n_in_stratum / sum(stratum_counts$n_in_stratum) * n
-stratum_counts$n_select <- floor(stratum_counts$target_n)
-stratum_counts$frac_part <- stratum_counts$target_n - stratum_counts$n_select
+stratum_counts$min_select <- ifelse(stratum_counts$n_in_stratum == 1L, 1L, 2L)
+base_alloc <- floor(stratum_counts$target_n)
+stratum_counts$frac_part <- stratum_counts$target_n - base_alloc
+stratum_counts$n_select <- pmax(base_alloc, stratum_counts$min_select)
+stratum_counts$n_select <- pmin(stratum_counts$n_select, stratum_counts$n_in_stratum)
 remaining <- n - sum(stratum_counts$n_select)
 if (remaining > 0) {
-  stratum_counts <- stratum_counts[order(-stratum_counts$frac_part, stratum_counts$STRATUM_LF), ]
-  stratum_counts$n_select[seq_len(remaining)] <- stratum_counts$n_select[seq_len(remaining)] + 1L
-  stratum_counts <- stratum_counts[order(stratum_counts$STRATUM_LF), ]
+  order_idx <- order(-stratum_counts$frac_part, stratum_counts$STRATUM_LF)
+  for (i in order_idx) {
+    if (remaining == 0) break
+    if (stratum_counts$n_select[i] < stratum_counts$n_in_stratum[i]) {
+      stratum_counts$n_select[i] <- stratum_counts$n_select[i] + 1L
+      remaining <- remaining - 1L
+    }
+  }
 }
+if (remaining < 0) {
+  order_idx <- order(stratum_counts$frac_part, stratum_counts$STRATUM_LF)
+  for (i in order_idx) {
+    if (remaining == 0) break
+    if (stratum_counts$n_select[i] > stratum_counts$min_select[i]) {
+      stratum_counts$n_select[i] <- stratum_counts$n_select[i] - 1L
+      remaining <- remaining + 1L
+    }
+  }
+}
+stopifnot(remaining == 0L)
+stratum_counts <- stratum_counts[order(stratum_counts$STRATUM_LF), ]
 stratum_counts$wgt_selection_component1 <- ifelse(stratum_counts$n_select > 0,
                                                   stratum_counts$n_in_stratum / stratum_counts$n_select,
                                                   NA_real_)
 stratum_counts$target_n <- NULL
 stratum_counts$frac_part <- NULL
+stratum_counts$min_select <- NULL
 stopifnot(sum(stratum_counts$n_select, na.rm = TRUE) == n)
 
 # ---- Randomize within strata and keep allocated units -----------------

@@ -101,9 +101,9 @@ if (abs((full_total - corrected_obs_total) - missing_total) < 1e-6) {
 # sum(g22_dom$WGT_LUCAS * g22_dom$WGT_EXT_GRASSLAND)
 # sum(extgrass22obs$WGT_LUCAS * extgrass22obs$WGT_EXT_GRASSLAND * extgrass22obs$wgt_correction)
 sum(g22_dom$WGT_EXT_GRASSLAND)
-# [1] 41914.35
+# [1] 44292.34
 sum(extgrass22obs$WGT_EXT_GRASSLAND * extgrass22obs$wgt_correction)
-# [1] 41467.49
+# [1] 43424.48
 
 #-------------------------------------------------------------------------------------------
 # Step 2: selection of remaining points (20000 - n_component1) for component 2 of the 2027 Grassland sample
@@ -170,14 +170,30 @@ if (TARGET > nrow(df)) {
 tab <- table(df$NUTS2_16)
 strata <- names(tab)
 Nh <- as.numeric(tab); names(Nh) <- strata
-prop <- Nh / sum(Nh)
-nh <- floor(prop * TARGET)
-remainder <- TARGET - sum(nh)
-if (remainder > 0) {
-  frac <- prop * TARGET - nh
-  ord <- order(-frac, -Nh)
-  add_strata <- strata[ord][seq_len(remainder)]
-  nh[add_strata] <- nh[add_strata] + 1L
+# Minimum of 2 per stratum (or 1 when only one unit exists)
+nh_min <- ifelse(Nh == 1L, 1L, 2L)
+nh_min <- pmin(Nh, nh_min)
+if (sum(nh_min) > TARGET) {
+  stop(sprintf("TARGET (%d) is smaller than the required minimum across strata (%d).", TARGET, sum(nh_min)))
+}
+
+# Allocate remaining proportionally after minimums
+remaining_target <- TARGET - sum(nh_min)
+allocatable <- Nh - nh_min
+allocatable_total <- sum(allocatable)
+
+nh <- nh_min
+if (remaining_target > 0 && allocatable_total > 0) {
+  prop_extra <- allocatable / allocatable_total
+  nh_extra <- floor(prop_extra * remaining_target)
+  remainder_extra <- remaining_target - sum(nh_extra)
+  if (remainder_extra > 0) {
+    frac <- prop_extra * remaining_target - nh_extra
+    ord <- order(-frac, -allocatable)
+    add_strata <- strata[ord][seq_len(remainder_extra)]
+    nh_extra[add_strata] <- nh_extra[add_strata] + 1L
+  }
+  nh <- nh + nh_extra
 }
 
 # Safety cap (should not trigger in typical case)

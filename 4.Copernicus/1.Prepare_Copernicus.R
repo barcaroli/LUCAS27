@@ -54,7 +54,7 @@ write.table(tot,"points_selected_in_Soil_Grassland_LF.csv",sep=",",quote=F,row.n
 
 remaining <- 130000 - nrow(tot)
 remaining
-# [1] 10525
+# [1] 9601
 
 load("master_complete.RData")
 
@@ -72,14 +72,14 @@ round(prop.table(table(tot$LC_pred)),5)
 # A       B       C       D       E       F       G       H 
 # 0.01027 0.44795 0.09770 0.01848 0.41863 0.00472 0.00079 0.00146 
 
-
+table(tot$LC_pred)
 
 
 
 
 
 # ---------------------------
-# Allocate 27,702 points to align LC_pred distribution (base R)
+# Allocate additional points to align LC_pred master distribution 
 # ---------------------------
 
 target_total <- nrow(tot) + remaining
@@ -176,6 +176,7 @@ write.csv(new_points,"Copernicus_allocations_LC_pred.csv", row.names = FALSE)
 
 # Final checks: projected proportions and total variation distance
 final_counts_vec <- cur_counts
+table(tot$LC_pred)
 final_counts_vec <- final_counts_vec + as.integer(add_alloc)
 names(final_counts_vec) <- cats
 final_prop <- final_counts_vec / sum(final_counts_vec)

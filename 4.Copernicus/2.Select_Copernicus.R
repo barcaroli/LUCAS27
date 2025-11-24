@@ -108,31 +108,55 @@ for (cat in cats_to_add) {
     n_needed <- nrow(pop)
   }
   
-  # Compute common sampling rate for this LC_pred
-  rate <- n_needed / nrow(pop)
-  
   # Assign deterministic PRN
   # pop$PRN <- prn_from_id(pop$POINT_ID)
   
-  # Split by NUTS0_21 and compute targets via largest remainder
+  # Split by NUTS0_21 and compute targets with a minimum per stratum
   g <- table(pop$NUTS0_21)
   nuts <- names(g)
   n_g <- as.numeric(g)
-  q <- rate * n_g
-  target <- largest_remainder(q)
-  # Adjust in case rounding drift remains
-  diff_total <- n_needed - sum(target)
-  if (diff_total != 0) {
-    # distribute by PRN ranks across groups
-    rem <- q - floor(q)
-    if (diff_total > 0) {
-      ord <- order(rem, decreasing = TRUE)
-      take <- seq_len(min(diff_total, length(ord)))
-      target[ord[take]] <- target[ord[take]] + 1L
+  # Minimum: 2 per stratum, or 1 if only one available unit
+  min_target <- pmin(ifelse(n_g == 1L, 1L, 2L), n_g)
+  min_total <- sum(min_target)
+  if (min_total > n_needed) {
+    warning(sprintf("LC_pred %s: minimum allocation (%d) exceeds requested %d; relaxing minima.", cat, min_total, n_needed))
+    # Relax to at least one per stratum when possible
+    min_target <- pmin(1L, n_g)
+    if (sum(min_target) > n_needed) {
+      # Not enough total to place one in each stratum: prioritise larger strata
+      ord <- order(n_g, decreasing = TRUE)
+      keep <- ord[seq_len(n_needed)]
+      min_target[] <- 0L
+      min_target[keep] <- 1L
+    }
+  }
+  target <- min_target
+  remaining <- n_needed - sum(target)
+  if (remaining > 0) {
+    extra_cap <- pmax(0L, n_g - target)
+    if (sum(extra_cap) == 0L) {
+      if (remaining > 0) warning(sprintf("LC_pred %s: requested %d but only %d available after minima.", cat, n_needed, sum(target)))
     } else {
-      ord <- order(rem, decreasing = FALSE)
-      take <- seq_len(min(-diff_total, length(ord)))
-      target[ord[take]] <- pmax(0L, target[ord[take]] - 1L)
+      q_extra <- remaining * (extra_cap / sum(extra_cap))
+      add <- largest_remainder(q_extra)
+      add <- pmin(add, extra_cap)
+      target <- target + add
+      # Adjust in case rounding drift remains
+      diff_total <- n_needed - sum(target)
+      if (diff_total != 0) {
+        rem <- q_extra - floor(q_extra)
+        ord <- order(rem, decreasing = diff_total > 0)
+        for (j in ord) {
+          if (diff_total == 0) break
+          if (diff_total > 0 && target[j] < n_g[j]) {
+            target[j] <- target[j] + 1L
+            diff_total <- diff_total - 1L
+          } else if (diff_total < 0 && target[j] > min_target[j]) {
+            target[j] <- target[j] - 1L
+            diff_total <- diff_total + 1L
+          }
+        }
+      }
     }
   }
   
@@ -169,6 +193,31 @@ print(data.frame(LC_pred = names(req), requested = as.integer(req),
 
 cat("\nSelected counts by LC_pred x NUTS0_21:\n")
 print(table(copernicus_selected$LC_pred, copernicus_selected$NUTS0_21))
+
+cat("\nSampling rate per LC_pred x NUTS0_21 (plot saved to sampling_rate_by_stratum.png):\n")
+avail_counts <- as.data.frame(table(master_avail$LC_pred, master_avail$NUTS0_21))
+names(avail_counts) <- c("LC_pred","NUTS0_21","available")
+sel_counts <- as.data.frame(table(copernicus_selected$LC_pred, copernicus_selected$NUTS0_21))
+names(sel_counts) <- c("LC_pred","NUTS0_21","selected")
+strata_summary <- merge(avail_counts, sel_counts, by = c("LC_pred","NUTS0_21"), all = TRUE)
+strata_summary$available[is.na(strata_summary$available)] <- 0L
+strata_summary$selected[is.na(strata_summary$selected)] <- 0L
+strata_summary$sampling_rate <- ifelse(strata_summary$available > 0, strata_summary$selected / strata_summary$available, 0)
+strata_summary$stratum <- paste(strata_summary$LC_pred, strata_summary$NUTS0_21, sep = "*")
+print(strata_summary[, c("LC_pred","NUTS0_21","available","selected","sampling_rate")])
+
+if (nrow(strata_summary) > 0) {
+  png("Copernicus_sampling_rate_by_stratum.png", width = 1600, height = 900, res = 150)
+  par(mar = c(12, 5, 4, 1))
+  barplot(strata_summary$sampling_rate,
+          names.arg = strata_summary$stratum,
+          las = 2, cex.names = 0.7,
+          ylab = "Sampling rate (selected / available)",
+          main = "Copernicus sampling rate by selection stratum",
+          ylim = c(0, max(strata_summary$sampling_rate, na.rm = TRUE) * 1.1))
+  abline(h = 0, col = "gray40")
+  dev.off()
+}
 
 copernicus_selected_b <- NULL
 copernicus_selected_b$POINT_ID <- copernicus_selected$POINT_ID

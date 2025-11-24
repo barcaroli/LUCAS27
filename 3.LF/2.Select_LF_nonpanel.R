@@ -26,13 +26,13 @@ load("master_complete.RData")
 # save(master_tot,file="master_complete.RData")
 # Frame with LF eligibility
 frame <- master_tot[(
-                    (substr(master_tot$CLC18_R,1,1) == 2) |
-                    (master_tot$STR25 == 1 |master_tot$STR25 == 2 | master_tot$STR25 == 3) |
-                    (master_tot$LU11 == 1)) & 
+                    # (substr(master_tot$CLC18_R,1,1) == 2) |
+                    (master_tot$STR25 == 1 | master_tot$STR25 == 2) |
+                    (master_tot$LU11 == 1 & master_tot$STR25 == 3)) & 
                     master_tot$reach_prob > 0.5,
                     ]
 nrow(frame)                    
-# [1] 326890
+# [1] 237573
 
 # ---- Remove panel units and define strata ----------------------------
 # Read 2022 processed LF sub-sample
@@ -40,7 +40,10 @@ LF22 <- read.csv("LF2027_panel.csv",dec=".")
 nrow(LF22)
 # [1] 79546
 frame <- frame[!frame$POINT_ID %in% LF22$POINT_ID,]
-frame$STRATUM_LF <- frame$NUTS0_24
+nrow(frame)
+# [1] 194025
+# frame$STRATUM_LF <- paste(frame$NUTS2_24,frame$LC_pred,sep="*")
+frame$STRATUM_LF <- frame$NUTS2_24
 table(frame$STRATUM_LF)
 
 # ---- Assign PRN and allocate target counts ---------------------------
@@ -48,6 +51,7 @@ set.seed(1234)
 
 N_total <- nrow(frame)
 target_total <- 93000-nrow(LF22)
+target_total
 
 # Allocation per stratum (proportional, with largest remainder)
 counts <- aggregate(list(N = rep(1L, N_total)),
@@ -55,21 +59,36 @@ counts <- aggregate(list(N = rep(1L, N_total)),
                     FUN = sum)
 counts <- counts[order(counts$STRATUM_LF), ]
 counts$alloc_raw <- target_total * counts$N / N_total
-counts$alloc <- floor(counts$alloc_raw)
+counts$min_alloc <- ifelse(counts$N == 1L, 1L, 2L)
+base_alloc <- floor(counts$alloc_raw)
+counts$frac_part <- counts$alloc_raw - base_alloc
+counts$alloc <- pmax(base_alloc, counts$min_alloc)
+counts$alloc <- pmin(counts$alloc, counts$N)
 rem <- target_total - sum(counts$alloc)
 if (rem > 0L) {
-  nS <- nrow(counts)
-  base_add <- rem %/% nS
-  extra <- rem %% nS
-  if (base_add > 0L) counts$alloc <- counts$alloc + base_add
-  if (extra > 0L) {
-    frac <- counts$alloc_raw - floor(counts$alloc_raw)
-    ord <- order(frac, decreasing = TRUE)
-    idx <- ord[seq_len(extra)]
-    counts$alloc[idx] <- counts$alloc[idx] + 1L
+  order_idx <- order(-counts$frac_part, counts$STRATUM_LF)
+  for (i in order_idx) {
+    if (rem == 0L) break
+    if (counts$alloc[i] < counts$N[i]) {
+      counts$alloc[i] <- counts$alloc[i] + 1L
+      rem <- rem - 1L
+    }
   }
 }
+if (rem < 0L) {
+  order_idx <- order(counts$frac_part, counts$STRATUM_LF)
+  for (i in order_idx) {
+    if (rem == 0L) break
+    if (counts$alloc[i] > counts$min_alloc[i]) {
+      counts$alloc[i] <- counts$alloc[i] - 1L
+      rem <- rem + 1L
+    }
+  }
+}
+stopifnot(rem == 0L)
 counts$alloc_raw <- NULL
+counts$frac_part <- NULL
+counts$min_alloc <- NULL
 
 # ---- Randomize within strata and select allocated units --------------
 # Random priority within stratum

@@ -4,13 +4,20 @@ soil <- read.xlsx("lucas2027_soil.xlsx")
 soil$POINT_ID <- soil$IDPOINT
 load("master_complete.RData")
 
+library(data.table)
+s22 <- fread("Survey_2022_wgt_2nd_phase.txt")
+soil <- merge(soil,s22[,c("POINT_ID","WGT_LUCAS"),],by="POINT_ID",all.x=TRUE)
+
+a <- soil[soil$POINT_ID %in% s22$POINT_ID,]
+
 # Build soil_sample with requested fields
 soil_sample <- merge(
-  soil["POINT_ID"],
+  soil[,c("POINT_ID","WGT_LUCAS")],
   master_tot[c("POINT_ID", "STR25", "NUTS2_24", "LC_pred")],
   by = "POINT_ID",
   all.x = TRUE
 )
+summary(soil_sample)
 
 soil_sample$STRATUM_STR25 <- interaction(
   soil_sample$NUTS2_24,
@@ -48,13 +55,11 @@ soil_sample$WGT_SOIL_STR25 <- as.numeric(master_STR25[soil_sample$STRATUM_STR25]
 soil_sample$WGT_SOIL_LC <- as.numeric(master_LC[soil_sample$STRATUM_LC]) /
   as.numeric(soil_LC[soil_sample$STRATUM_LC])
 
-
-
 samp <- NULL
 samp$POINT_ID <- soil_sample$POINT_ID
 samp$component <- ""
 samp$STRATUM <- soil_sample$STRATUM_LC
-samp$WGT_LUCAS <- 1 
+samp$WGT_LUCAS <- soil_sample$WGT_LUCAS 
 samp$WGT_comp <- 1
 samp$eligibility_comp <- ""
 samp$LC1 <- soil_sample$LC_pred
