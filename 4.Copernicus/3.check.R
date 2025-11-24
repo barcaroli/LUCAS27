@@ -51,7 +51,7 @@ bp <- barplot(M,
               main = "LC1 (tot) vs LC_pred (master): percentages")
 
 xg <- colMeans(bp)
-axis(1, at = xg, labels = cats, las = 2, tick = FALSE)
+axis(1, at = xg, labels = cats, las = 1, tick = FALSE)
 legend("topright",
        legend = c("Tot (LC1)", "Master (LC_pred)"),
        fill   = c("blue", "red"),

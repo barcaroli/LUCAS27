@@ -73,7 +73,7 @@ counts$alloc_raw <- NULL
 
 # ---- Randomize within strata and select allocated units --------------
 # Random priority within stratum
-frame$PRN <- runif(N_total)
+
 
 # Join allocation to rows
 counts_sub <- counts[, c("STRATUM_LF", "N", "alloc")]

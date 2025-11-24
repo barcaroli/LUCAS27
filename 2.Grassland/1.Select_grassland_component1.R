@@ -25,6 +25,8 @@ grass22 <- read.csv2("grassland_sample_2022.csv",dec=".")
 # --- Keep only observed points falling into classes D/E ---
 # Select actually observed points
 grass22obs <- grass22[grass22$ID %in% points$POINT_ID_Grassland,]
+nrow(grass22obs)
+# ù[1] 12119
 # Select actually observed points in "E" and "D"
 grass22obs <- merge(grass22obs,lucas22[,c("POINT_ID","LC1")],by.x="ID",by.y="POINT_ID")
 grass22obs <- grass22obs[grass22obs$LC1 %in% c("E","D"),]

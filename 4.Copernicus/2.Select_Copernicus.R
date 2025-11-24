@@ -68,12 +68,12 @@ if (!("n_add" %in% names(new_points))) {
 }
 
 # Deterministic PRN generator from POINT_ID using base R only
-prn_from_id <- function(id) {
-  s <- charToRaw(as.character(id))
-  h <- 0L
-  for (b in as.integer(s)) h <- (h * 131L + b) %% 2147483647L
-  (h + 0.5) / 2147483647
-}
+# prn_from_id <- function(id) {
+#   s <- charToRaw(as.character(id))
+#   h <- 0L
+#   for (b in as.integer(s)) h <- (h * 131L + b) %% 2147483647L
+#   (h + 0.5) / 2147483647
+# }
 
 # Helper: largest remainder allocation to hit exact totals per LC_pred
 largest_remainder <- function(q) {
@@ -101,7 +101,7 @@ names(selected_list) <- cats_to_add
 # ---- Iterate by category and draw points ----
 for (cat in cats_to_add) {
   n_needed <- as.integer(new_points$n_add[new_points$LC_pred == cat][1])
-  pop <- master_avail[master_avail$LC_pred == cat, c("POINT_ID","LC_pred","NUTS0_21")]
+  pop <- master_avail[master_avail$LC_pred == cat, c("POINT_ID","LC_pred","NUTS0_21","PRN")]
   if (nrow(pop) == 0L || n_needed <= 0L) next
   if (n_needed > nrow(pop)) {
     warning(sprintf("LC_pred %s: requested %d exceeds available %d; capping.", cat, n_needed, nrow(pop)))
@@ -112,7 +112,7 @@ for (cat in cats_to_add) {
   rate <- n_needed / nrow(pop)
   
   # Assign deterministic PRN
-  pop$PRN <- prn_from_id(pop$POINT_ID)
+  # pop$PRN <- prn_from_id(pop$POINT_ID)
   
   # Split by NUTS0_21 and compute targets via largest remainder
   g <- table(pop$NUTS0_21)
@@ -156,6 +156,7 @@ for (cat in cats_to_add) {
 }
 
 copernicus_selected <- do.call(rbind, selected_list)
+copernicus_selected <- copernicus_selected[!duplicated(copernicus_selected$POINT_ID),]
 
 # ---- Export selection and report diagnostics ----
 write.csv(copernicus_selected, "Copernicus2027_sample.csv", row.names = FALSE)

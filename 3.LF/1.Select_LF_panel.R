@@ -77,7 +77,7 @@ sum(g22_dom$WGT_LF,na.rm=T)
 # [1] 124307.7
 sum(LF22obs$WGT_LF * LF22obs$wgt_correction)
 # [1] 124307.7
-# colnames(LF22obs)[2] <- "POINT_ID"
+colnames(LF22obs)[colnames(LF22obs) == "ID"] <- "POINT_ID"
 
 n <- 93000 / 2
 n

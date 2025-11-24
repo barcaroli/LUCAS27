@@ -43,6 +43,7 @@ comp2b <- as.data.frame(comp2b)
 
 # --- Combine components and export final sample ---
 samp <- rbind(comp1b,comp2b)
+samp <- samp[!duplicated(samp$POINT_ID),]
 write.table(samp,"Grassland2027_sample.csv",sep=",",quote=F,row.names=F)
 
 

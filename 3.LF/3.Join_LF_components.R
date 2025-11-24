@@ -19,7 +19,7 @@ setwd("D:/Google Drive/LUCAS 2026/dati")
 # ---- Prepare component 1 records -------------------------------------
 comp1 <- read.csv("LF2027_panel.csv")
 comp1b <- NULL
-comp1b$POINT_ID <- comp1$ID
+comp1b$POINT_ID <- comp1$POINT_ID
 comp1b$component <- "component1"
 comp1b$STRATUM <- comp1$STRATUM_LF
 comp1b$WGT_LUCAS <- comp1$WGT_LUCAS 
@@ -47,6 +47,7 @@ comp2b <- as.data.frame(comp2b)
 
 # ---- Merge components and export sample ------------------------------
 samp <- rbind(comp1b,comp2b)
+samp <- samp[!duplicated(samp$POINT_ID),]
 table(samp$STRATUM)
 write.table(samp,"LF2027_sample.csv",sep=",",quote=F,row.names=F)
 

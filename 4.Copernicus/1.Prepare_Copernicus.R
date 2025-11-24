@@ -54,7 +54,7 @@ write.table(tot,"points_selected_in_Soil_Grassland_LF.csv",sep=",",quote=F,row.n
 
 remaining <- 130000 - nrow(tot)
 remaining
-# [1] 18500
+# [1] 10525
 
 load("master_complete.RData")
 
@@ -263,3 +263,4 @@ legend("topright",
        fill   = c("red", "blue"),
        border = NA,
        bty    = "n")
+

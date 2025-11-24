@@ -32,12 +32,12 @@ extgrass22 <- read.csv2("grassland_extended_sample_2022.csv",dec=".")
 extgrass22obs <- extgrass22[extgrass22$ID %in% points$POINT_ID_Ext..GRASS,]
 # Select actually observed points in "E" and "D"
 extgrass22obs <- merge(extgrass22obs,lucas22[,c("POINT_ID","LC1")],by.x="ID",by.y="POINT_ID")
-extgrass22obs <- extgrass22obs[extgrass22obs$LC1 == "E",]
+extgrass22obs <- extgrass22obs[extgrass22obs$LC1 %in% c("E","D"),]
 nrow(extgrass22obs)
 # [1] 26012
 # Calculate calibrated weights
 g22_dom <- merge(extgrass22, lucas22[, c("POINT_ID","LC1")], by.x = "ID", by.y = "POINT_ID", all.x = TRUE)
-g22_dom <- g22_dom[g22_dom$LC1 == "E", ]
+g22_dom <- g22_dom[g22_dom$LC1 %in% c("E","D"), ]
 g22_dom <- g22_dom[!is.na(g22_dom$WGT_EXT_GRASSLAND),]
 
 # N.B. : we have no "STRATUM_EXTENDED_GRASSLAND, only STRATUM_LUCAS
@@ -106,11 +106,26 @@ sum(extgrass22obs$WGT_EXT_GRASSLAND * extgrass22obs$wgt_correction)
 # [1] 41467.49
 
 #-------------------------------------------------------------------------------------------
-# Step 2: selection of 8,901 points (20000 - 11099) (component 2 of the 2027 Grassland sample)
+# Step 2: selection of remaining points (20000 - n_component1) for component 2 of the 2027 Grassland sample
 #-------------------------------------------------------------------------------------------
 # --- Reproducibility seed and random numbers for selection ---
-set.seed(1234)
-extgrass22obs$PRN <- runif(nrow(extgrass22obs))
+load("master_complete.RData")
+extgrass22obs <- merge(extgrass22obs,master_tot[,c("POINT_ID","PRN")],by.x="ID",by.y="POINT_ID")
+
+# --- Remove points already selected for component 1 ---
+comp1_path <- "Grassland2027_component1.csv"
+component1_n <- 11099L
+if (file.exists(comp1_path)) {
+  comp1 <- fread(comp1_path)
+  component1_n <- nrow(comp1)
+  before_drop <- nrow(extgrass22obs)
+  extgrass22obs <- extgrass22obs[!(extgrass22obs$ID %in% comp1$POINT_ID), ]
+  cat(sprintf("Filtered %d component 1 points; %d candidates remain for component 2.\n",
+              before_drop - nrow(extgrass22obs), nrow(extgrass22obs)))
+} else {
+  warning(sprintf("%s not found; overlap with component 1 cannot be removed.", comp1_path))
+}
+
 table(extgrass22obs$NUTS2_16)
 # AT11 AT12 AT13 AT21 AT22 AT31 AT32 AT33 AT34 BE21 BE22 BE23 BE24 BE25 BE31 BE32 BE33 BE34 
 # 39  196    1  112  202  222  121  125   37   41   40   71   43   60   18   62  109  142 
@@ -144,7 +159,12 @@ extgrass22obs <- extgrass22obs[order(extgrass22obs$PRN, decreasing = TRUE),]
 # Base R implementation (no data.table)
 df <- extgrass22obs[!is.na(extgrass22obs$NUTS2_16), , drop = FALSE]
 
-TARGET <- 8901L
+TOTAL_TARGET <- 20000L
+TARGET <- as.integer(max(0, TOTAL_TARGET - component1_n))
+if (TARGET > nrow(df)) {
+  stop(sprintf("Not enough points left for component 2 after excluding component 1 (need %d, have %d).",
+               TARGET, nrow(df)))
+}
 
 # Allocation proportional to stratum size (Nh) by NUTS2_16 with largest‑remainder rounding
 tab <- table(df$NUTS2_16)
