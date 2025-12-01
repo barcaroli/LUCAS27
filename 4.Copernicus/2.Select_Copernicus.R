@@ -183,7 +183,7 @@ copernicus_selected <- do.call(rbind, selected_list)
 copernicus_selected <- copernicus_selected[!duplicated(copernicus_selected$POINT_ID),]
 
 # ---- Export selection and report diagnostics ----
-write.csv(copernicus_selected, "Copernicus2027_sample.csv", row.names = FALSE)
+# write.csv(copernicus_selected, "Copernicus2027_sample.csv", row.names = FALSE)
 
 cat("\nRequested by LC_pred (n_add) vs selected:\n")
 req <- setNames(as.integer(new_points$n_add), as.character(new_points$LC_pred))
@@ -219,20 +219,35 @@ if (nrow(strata_summary) > 0) {
   dev.off()
 }
 
-copernicus_selected_b <- NULL
-copernicus_selected_b$POINT_ID <- copernicus_selected$POINT_ID
-copernicus_selected_b$component <- ""
-copernicus_selected_b$STRATUM <- paste(copernicus_selected$LC_pred,copernicus_selected$NUTS0_24,sep="*")
-copernicus_selected_b$WGT_LUCAS <- ""
-copernicus_selected_b$WGT_comp <- 1
-copernicus_selected_b$eligibility_comp <- 1
-copernicus_selected_b$LC1 <- copernicus_selected$LC_pred
-copernicus_selected_b$wgt_correction <- 1
-copernicus_selected_b$wgt_selection <- copernicus_selected$weight_copernicus
-copernicus_selected_b <- as.data.frame(copernicus_selected_b)
+# copernicus_selected_b <- NULL
+# copernicus_selected_b$POINT_ID <- copernicus_selected$POINT_ID
+# copernicus_selected_b$component <- ""
+# copernicus_selected_b$STRATUM <- paste(copernicus_selected$LC_pred,copernicus_selected$NUTS0_24,sep="*")
+# copernicus_selected_b$WGT_LUCAS <- ""
+# copernicus_selected_b$WGT_comp <- 1
+# copernicus_selected_b$eligibility_comp <- 1
+# copernicus_selected_b$LC1 <- copernicus_selected$LC_pred
+# copernicus_selected_b$wgt_correction <- 1
+# copernicus_selected_b$wgt_selection <- copernicus_selected$weight_copernicus
+# copernicus_selected_b <- as.data.frame(copernicus_selected_b)
 
 # Write output and print summaries
-write.csv(copernicus_selected_b, "Copernicus2027_sample.csv", row.names = FALSE)
+samp <- NULL
+samp$POINT_ID <- copernicus_selected$POINT_ID
+samp$module <- "Copernicus"
+samp$component <- ""
+samp$NUTS2 <- copernicus_selected$NUTS2_24
+samp$LC_pred <- copernicus_selected$LC_pred
+samp$STR25 <- copernicus_selected$STR25
+samp$WGT_LUCAS <- 1
+samp$WGT_comp <- 1
+samp$eligibility_comp <- NA
+samp$wgt_correction <- 1
+samp$wgt_selection <- copernicus_selected$weight_copernicus
+samp <- as.data.frame(samp)
+
+
+write.csv(samp, "Copernicus2027_sample.csv", row.names = FALSE)
 
 cat("\nRequested by LC_pred (n_add) vs selected:\n")
 req <- setNames(as.integer(new_points$n_add), as.character(new_points$LC_pred))
@@ -242,3 +257,4 @@ print(data.frame(LC_pred = names(req), requested = as.integer(req),
 
 cat("\nSelected counts by LC_pred x NUTS0_24:\n")
 print(table(copernicus_selected$LC_pred, copernicus_selected$NUTS0_21))
+

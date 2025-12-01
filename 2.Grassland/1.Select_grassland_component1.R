@@ -13,6 +13,7 @@
 #--------------------------------------------------------------------------
 # --- Environment setup and core inputs ---
 setwd("D:/Google Drive/LUCAS 2026/dati")
+
 library(data.table)
 lucas22 <- fread("Survey_2022_wgt_2nd_phase.txt")
 lucas22$LC1 <- substr(lucas22$SURVEY_LC1,1,1)
@@ -22,14 +23,20 @@ library(openxlsx)
 points <- read.xlsx("effective_points_modules.xlsx")
 # Read 2022 Grassland sub-sample
 grass22 <- read.csv2("grassland_sample_2022.csv",dec=".")
+load("master_complete.RData")
+grass22$LC_pred <- NULL
+grass22 <- merge(grass22,master_tot[,c("POINT_ID","STR25","LC_pred","NUTS2_24")],by.x="ID",by.y="POINT_ID")
+
 # --- Keep only observed points falling into classes D/E ---
 # Select actually observed points
 grass22obs <- grass22[grass22$ID %in% points$POINT_ID_Grassland,]
 nrow(grass22obs)
-# ù[1] 12119
+# [1] 12119
 # Select actually observed points in "E" and "D"
 grass22obs <- merge(grass22obs,lucas22[,c("POINT_ID","LC1")],by.x="ID",by.y="POINT_ID")
 grass22obs <- grass22obs[grass22obs$LC1 %in% c("E","D"),]
+# grass22obs <- grass22obs[grass22obs$STR25 %in% c(3L,5L),]
+
 nrow(grass22obs)
 # [1] 11099
 # --- Compute weight correction by grassland stratum ---
@@ -68,7 +75,21 @@ sum(grass22obs$WGT_GRASSLAND * grass22obs$wgt_correction)
 # [1] 46530.1
 # --- Prepare final variables and export component 1 ---
 colnames(grass22obs)[2] <- "POINT_ID"
-write.table(grass22obs,"Grassland2027_component1.csv",sep=",",quote=T,row.names=F)
+
+samp <- NULL
+samp$POINT_ID <- grass22obs$POINT_ID
+samp$module <- "GRASSLAND"
+samp$component <- "component1"
+samp$NUTS2 <- grass22obs$NUTS2_24
+samp$LC_pred <- grass22obs$LC_pred
+samp$STR25 <- grass22obs$STR25
+samp$WGT_LUCAS <- grass22obs$WGT_LUCAS 
+samp$WGT_comp <- 1
+samp$eligibility_comp <- grass22obs$eligibility_rate_grassland
+samp$wgt_correction <- grass22obs$wgt_correction
+samp$wgt_selection <- grass22obs$WGT_GRASSLAND
+samp <- as.data.frame(samp)
+write.table(samp,"Grassland2027_component1.csv",sep=",",quote=T,row.names=F)
 
 
 
