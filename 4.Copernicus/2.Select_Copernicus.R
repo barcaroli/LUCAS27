@@ -2,7 +2,7 @@
 # Script: 2.Select_Copernicus.R
 # Description: takes the Copernicus allocation plan and performs the
 #              deterministic PRN-based selection of the new points per
-#              LC_pred and NUTS0_21, ensuring balanced totals and weights.
+#              LC_pred and STRATUM (NUTS2_24*STR25), ensuring balanced totals and weights.
 # Input: master_complete.RData, Copernicus_allocations_LC_pred.csv
 #        (or allocations_LC_pred.csv fallback),
 #        points_selected_in_Soil_Grassland_LF.csv
@@ -33,7 +33,7 @@ if (exists("master_tot")) {
   stop("Neither master_tot nor master_complete found in master_complete.RData")
 }
 
-req_cols <- c("POINT_ID", "LC_pred", "NUTS0_24")
+req_cols <- c("POINT_ID", "LC_pred", "NUTS2_24", "STR25", "PRN")
 missing_cols <- setdiff(req_cols, names(master_df))
 if (length(missing_cols) > 0) stop(paste("Missing columns in master:", paste(missing_cols, collapse=", ")))
 
@@ -56,6 +56,7 @@ if (exists("already_selected")) {
 }
 
 master_avail <- master_df[!(master_df$POINT_ID %in% exclusion_ids), ]
+master_avail$STRATUM <- paste(master_avail$NUTS2_24, master_avail$STR25, sep = "*")
 
 # ---- Standardise allocation table columns ----
 # Standardize new_points columns
@@ -101,7 +102,7 @@ names(selected_list) <- cats_to_add
 # ---- Iterate by category and draw points ----
 for (cat in cats_to_add) {
   n_needed <- as.integer(new_points$n_add[new_points$LC_pred == cat][1])
-  pop <- master_avail[master_avail$LC_pred == cat, c("POINT_ID","LC_pred","NUTS0_24","PRN")]
+  pop <- master_avail[master_avail$LC_pred == cat, c("POINT_ID","LC_pred","NUTS2_24","STR25","STRATUM","PRN")]
   if (nrow(pop) == 0L || n_needed <= 0L) next
   if (n_needed > nrow(pop)) {
     warning(sprintf("LC_pred %s: requested %d exceeds available %d; capping.", cat, n_needed, nrow(pop)))
@@ -111,9 +112,9 @@ for (cat in cats_to_add) {
   # Assign deterministic PRN
   # pop$PRN <- prn_from_id(pop$POINT_ID)
   
-  # Split by NUTS0_24 and compute targets with a minimum per stratum
-  g <- table(pop$NUTS0_24)
-  nuts <- names(g)
+  # Split by STRATUM (NUTS2_24 x STR25) and compute targets with a minimum per stratum
+  g <- table(pop$STRATUM)
+  strata <- names(g)
   n_g <- as.numeric(g)
   # Minimum: 2 per stratum, or 1 if only one available unit
   min_target <- pmin(ifelse(n_g == 1L, 1L, 2L), n_g)
@@ -160,22 +161,23 @@ for (cat in cats_to_add) {
     }
   }
   
-  # Select within each NUTS0_24 by PRN and attach weight_copernicus = N_h / n_h
-  sel_rows <- vector("list", length(nuts))
-  for (i in seq_along(nuts)) {
-    ng <- nuts[i]
+  # Select within each STRATUM by PRN and attach weight_copernicus = N_h / n_h
+  sel_rows <- vector("list", length(strata))
+  for (i in seq_along(strata)) {
+    ng <- strata[i]
     N_h <- n_g[i]
     n_h <- target[i]
     if (n_h <= 0L) { sel_rows[[i]] <- NULL; next }
-    sub <- pop[pop$NUTS0_24 == ng, ]
+    sub <- pop[pop$STRATUM == ng, ]
     sub <- sub[order(sub$PRN), ]
     take <- head(sub, n_h)
     take$weight_copernicus <- N_h / n_h
-    sel_rows[[i]] <- take[, c("POINT_ID","LC_pred","NUTS0_24","weight_copernicus")]
+    sel_rows[[i]] <- take[, c("POINT_ID","LC_pred","NUTS2_24","STR25","STRATUM","weight_copernicus")]
   }
   sel_meta <- do.call(rbind, sel_rows)
   sel_full <- master_df[match(sel_meta$POINT_ID, master_df$POINT_ID), ]
   sel_full$weight_copernicus <- sel_meta$weight_copernicus
+  sel_full$STRATUM <- sel_meta$STRATUM
   selected_list[[cat]] <- sel_full
 }
 
@@ -191,20 +193,34 @@ sel <- table(copernicus_selected$LC_pred)
 print(data.frame(LC_pred = names(req), requested = as.integer(req),
                  selected = as.integer(sel[names(req)]), row.names = NULL))
 
-cat("\nSelected counts by LC_pred x NUTS0_24:\n")
-print(table(copernicus_selected$LC_pred, copernicus_selected$NUTS0_24))
+cat("\nSelected counts by LC_pred x STRATUM (NUTS2_24*STR25):\n")
+print(table(copernicus_selected$LC_pred, copernicus_selected$STRATUM))
 
-cat("\nSampling rate per LC_pred x NUTS0_24 (plot saved to sampling_rate_by_stratum.png):\n")
-avail_counts <- as.data.frame(table(master_avail$LC_pred, master_avail$NUTS0_24))
-names(avail_counts) <- c("LC_pred","NUTS0_24","available")
-sel_counts <- as.data.frame(table(copernicus_selected$LC_pred, copernicus_selected$NUTS0_24))
-names(sel_counts) <- c("LC_pred","NUTS0_24","selected")
-strata_summary <- merge(avail_counts, sel_counts, by = c("LC_pred","NUTS0_24"), all = TRUE)
+cat("\nSampling rate per LC_pred x STRATUM (NUTS2_24*STR25) (plot saved to sampling_rate_by_stratum.png):\n")
+avail_counts <- as.data.frame(table(master_avail$LC_pred, master_avail$STRATUM))
+names(avail_counts) <- c("LC_pred","STRATUM","available")
+sel_counts <- as.data.frame(table(copernicus_selected$LC_pred, copernicus_selected$STRATUM))
+names(sel_counts) <- c("LC_pred","STRATUM","selected")
+strata_summary <- merge(avail_counts, sel_counts, by = c("LC_pred","STRATUM"), all = TRUE)
 strata_summary$available[is.na(strata_summary$available)] <- 0L
 strata_summary$selected[is.na(strata_summary$selected)] <- 0L
 strata_summary$sampling_rate <- ifelse(strata_summary$available > 0, strata_summary$selected / strata_summary$available, 0)
-strata_summary$stratum <- paste(strata_summary$LC_pred, strata_summary$NUTS0_24, sep = "*")
-print(strata_summary[, c("LC_pred","NUTS0_24","available","selected","sampling_rate")])
+strata_summary$stratum <- paste(strata_summary$LC_pred, strata_summary$STRATUM, sep = "*")
+if (nrow(strata_summary) > 0) {
+  strata_parts <- do.call(
+    rbind,
+    strsplit(
+      ifelse(is.na(strata_summary$STRATUM), "NA*NA", as.character(strata_summary$STRATUM)),
+      "\\*"
+    )
+  )
+  strata_summary$NUTS2_24 <- strata_parts[, 1]
+  strata_summary$STR25 <- strata_parts[, 2]
+} else {
+  strata_summary$NUTS2_24 <- character(0)
+  strata_summary$STR25 <- character(0)
+}
+print(strata_summary[, c("LC_pred","NUTS2_24","STR25","available","selected","sampling_rate")])
 
 if (nrow(strata_summary) > 0) {
   png("Copernicus_sampling_rate_by_stratum.png", width = 1600, height = 900, res = 150)
@@ -239,6 +255,7 @@ samp$component <- ""
 samp$NUTS2 <- copernicus_selected$NUTS2_24
 samp$LC_pred <- copernicus_selected$LC_pred
 samp$STR25 <- copernicus_selected$STR25
+# samp$STRATUM <- paste(samp$NUTS2, samp$STR25, sep = "*")
 samp$WGT_LUCAS <- 1
 samp$WGT_comp <- 1
 samp$eligibility_comp <- NA
@@ -246,8 +263,8 @@ samp$wgt_correction <- 1
 samp$wgt_selection <- copernicus_selected$weight_copernicus
 samp <- as.data.frame(samp)
 
-
-write.csv(samp, "Copernicus2027_sample.csv", row.names = FALSE)
+# Write the additional points needed by Copernicus
+write.csv(samp, "Copernicus2027_sample_add.csv", row.names = FALSE)
 
 cat("\nRequested by LC_pred (n_add) vs selected:\n")
 req <- setNames(as.integer(new_points$n_add), as.character(new_points$LC_pred))
@@ -255,6 +272,6 @@ sel <- table(copernicus_selected$LC_pred)
 print(data.frame(LC_pred = names(req), requested = as.integer(req),
                  selected = as.integer(sel[names(req)]), row.names = NULL))
 
-cat("\nSelected counts by LC_pred x NUTS0_24:\n")
-print(table(copernicus_selected$LC_pred, copernicus_selected$NUTS0_21))
+cat("\nSelected counts by LC_pred x STRATUM (NUTS2_24*STR25):\n")
+print(table(copernicus_selected$LC_pred, copernicus_selected$STRATUM))
 

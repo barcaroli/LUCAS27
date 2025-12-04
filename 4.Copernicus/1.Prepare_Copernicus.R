@@ -42,8 +42,13 @@ setwd("D:/Google Drive/LUCAS 2026/dati")
 
 # ---- Load thematic selections and compute remaining budget ----
 Soil <- read.csv("Soil2027_sample.csv")
+a <- Soil[is.na(Soil$NUTS2),]
+Soil <- Soil[!is.na(Soil$NUTS2),]
 Grass <- read.csv("Grassland2027_sample.csv")
+b <- Grass[is.na(Grass$NUTS2),]
 LF <- read.csv("LF2027_sample.csv")
+c <- LF[is.na(LF$NUTS2),]
+
 
 tot <- rbind(Soil,Grass,LF)
 
@@ -54,7 +59,7 @@ write.table(tot,"points_selected_in_Soil_Grassland_LF.csv",sep=",",quote=F,row.n
 
 remaining <- 130000 - nrow(tot)
 remaining
-# [1] 5317
+# [1] 5321
 
 load("master_complete.RData")
 

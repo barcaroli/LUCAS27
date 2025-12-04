@@ -8,10 +8,12 @@
 # ------------------------------------------------------------------------------
 
 setwd("D:/Google Drive/LUCAS 2026/dati")
+load("master_complete.RData")
 library(openxlsx)
-soil <- read.csv("lucas_soil_sample_2027.csv")
+soil <- read.csv("lucas_soil_sample20251203.csv")
 soil$POINT_ID <- soil$IDPOINT
-xtabs(LUCAS_soil_2027 ~ bio2027_flag, data=soil)
+a <- soil[!soil$POINT_ID %in% master_tot$POINT_ID,]
+write.table(a,"Soil_not_in_master.csv",sep=",",quote=F,row.names=F)
 
 toberemoved <- read.xlsx("Soil_to_be_removed.xlsx")
 soil <- soil[!soil$IDPOINT %in% toberemoved$`POINT_ID.(XX01)` & 
@@ -20,7 +22,7 @@ soil <- soil[!soil$IDPOINT %in% toberemoved$`POINT_ID.(XX01)` &
              !soil$IDPOINT %in% toberemoved$`POINT_ID.(FA04)` &
              !soil$IDPOINT %in% toberemoved$`POINT_ID.(AB02)` &
              !soil$IDPOINT %in% toberemoved$`POINT_ID.(AB10)`,  ]
-addmargins(xtabs(LUCAS_soil_2027 ~ bio2027_flag, data=soil))
+addmargins(xtabs( ~ bio2027_flag, data=soil))
 write.table(soil,"lucas_soil_sample_2027_clean.csv")
 
 load("master_complete.RData")
