@@ -111,6 +111,8 @@ LF$correction_factor[is.na(LF$correction_factor)] <- 1
 LF$WGT_module_27 <- LF$WGT_LF * LF$correction_factor
 sum(LF$WGT_module_27)
 # [1] 433620.6
+LF$WGT_LF <- LF$correction_factor <- NULL
+
 
 write.table(LF,"LF2027_sample.csv",sep=",",quote=F,row.names=F)
 
