@@ -1,19 +1,21 @@
-#------------------------------------------------
-# Preparation of 2027 LF sub-sample 
-#------------------------------------------------
-# Description: prepares the 2027 LF sample
-# by filtering observed 2022 LF points, re-calibrating weights
-#------------------------------------------------
-# Input datasets:
-# - Survey_2022_wgt_2nd_phase.txt (observed 2022 survey)
-# - effective_points_modules.xlsx (actually observed points by module)
-# - LF_sample_2022.csv (original LF subsample with design info)
-#------------------------------------------------
-# Output datasets:
-# - LF_sample_202_obs.csv 
-#------------------------------------------------
-
-# ---- Setup environment ------------------------------------------------
+###############################################################
+# Script: 1.Prepare_LF.R
+# Purpose: Prepare the 2022 LF observed sample with calibrated
+#          weights per LF stratum for later allocation steps.
+# Main steps:
+# 1) Load master frame and 2022 survey microdata.
+# 2) Ingest the effective LF sub-sample and derive LF strata.
+# 3) Identify actually observed and eligible LF points.
+# 4) Calibrate LF weights within each LF stratum.
+# 5) Export the cleaned, calibrated 2022 LF observations.
+# Inputs:
+# - master_complete.RData
+# - Survey_2022_wgt_2nd_phase.txt
+# - effective_points_modules.xlsx
+# - LF_sample_2022.csv
+# Outputs:
+# - LF_sample_2022_obs.csv
+###############################################################
 setwd("D:/Google Drive/LUCAS 2026/dati")
 library(data.table)
 library(openxlsx)
@@ -25,9 +27,8 @@ library(openxlsx)
 load("master_complete.RData")
 
 # ---- Load LF subsample inputs ----------------------------------------
-# Read observed points in module sub-samples
+# Read observed points in module sub-samples and LF 2022 sample
 points <- read.xlsx("effective_points_modules.xlsx")
-# Read 2022 LF sub-sample
 LF22 <- read.csv2("LF_sample_2022.csv",dec=".")
 LF22$LC_pred <- NULL
 LF22 <- merge(LF22,master_tot[,c("POINT_ID","STR25","LC_pred","NUTS2_24")],by.x="ID",by.y="POINT_ID")
@@ -36,37 +37,29 @@ LF22$STRATUM_LF <- paste(LF22$NUTS2_24,LF22$STR25,sep="*")
 
 # ---- Determine actually observed and eligible LF points --------------
 # Select actually observed points
-# N.B.: ask for the difference betweeen Standard and Bulk, and if we can use them all or not
 LF22obs <- LF22[LF22$ID %in% points$POINT_ID_LF,]
-# LF22obs <- merge(LF22obs,master_tot[,c("POINT_ID","STR25","LC_pred","NUTS2_24")],by.x="ID",by.y="POINT_ID")
-# Select actually observed points in "E" and "D"
-# LF22obs1 <- LF22obs[(LF22obs$LUobs == "U11" & LF22obs$LCobs == "E") | (LF22obs$LCobs == "B"),] 
-LF22obs1 <- LF22obs[(LF22obs$LUobs == "U11" & LF22obs$STR25 == 3) | (LF22obs$STR25 %in% c(1,2)),] 
-nrow(LF22obs1)
-# [1] 64089
-# (LU11 = 1 AND STR25=3) OR (STR25=1,2)
-# LF22obs2 <- LF22obs[LF22obs$LCobs %in% c("B","E") | LF22obs$LUobs == "U11",]  
-# LF22obs2 <- LF22obs[(LF22obs$LUobs == "U11") | (LF22obs$STR25 %in% c(1,2,3)),]
-# nrow(LF22obs2)
+
+
+# Select eligible points
+LF22obs <- LF22obs[LF22obs$STR25 %in% c(1,2,3) | LF22obs$LUobs == "U11",]
+nrow(LF22obs)
 # [1] 78318
 
-LF22obs <- LF22obs1
-
-# ---- Calibrate weights within LF strata -------------------------------
-# Calculate calibrated weights
+# ---- Calibrate weights within LF strata ------------------------------
+# Compute calibration factors to align observed LF weights to the full
+# sample totals within each LF stratum
 # g22_dom <- merge(LF22obs, lucas22[, c("POINT_ID","LCobs","LUobs")], by.x = "ID", by.y = "POINT_ID", all.x = TRUE)
 g22_dom <- LF22
-g22_dom <- g22_dom[(g22_dom$LUobs == "U11" & g22_dom$STR25 == 3) | (g22_dom$STR25 %in% c(1,2)),]
+g22_dom <- g22_dom[g22_dom$STR25 %in% c(1,2,3) | g22_dom$LUobs == "U11",]
 
 full_sums <- as.data.table(g22_dom)[
-  # , .(sum_full = sum(WGT_LUCAS * WGT_LF / eligibility_rate_LFland, na.rm = TRUE)),
+  # , .(sum_full = sum(WGT_LUCAS * WGT_LF / eligibility_rate_LF, na.rm = TRUE)),
   # , .(sum_full = sum(WGT_LUCAS * WGT_LF, na.rm = TRUE)),
   , .(sum_full = sum(WGT_LF, na.rm = TRUE)),
   by = STRATUM_LF
 ]
-
 obs_sums <- as.data.table(LF22obs)[
-  # , .(sum_obs = sum(WGT_LUCAS * WGT_LF / eligibility_rate_LFland, na.rm = TRUE)),
+  # , .(sum_obs = sum(WGT_LUCAS * WGT_LF / eligibility_rate_LF, na.rm = TRUE)),
   # , .(sum_obs = sum(WGT_LUCAS * WGT_LF, na.rm = TRUE)),
   , .(sum_obs = sum(WGT_LF, na.rm = TRUE)),
   by = STRATUM_LF
@@ -81,17 +74,15 @@ LF22obs <- merge(LF22obs, wgts[, .(STRATUM_LF, wgt_correction)], by = "STRATUM_L
 summary(g22_dom$WGT_LF)
 
 # Coherence check
-# sum(g22_dom$WGT_LUCAS * g22_dom$WGT_LF / g22_dom$eligibility_rate_LFland)
-# sum(LF22obs$WGT_LUCAS * LF22obs$WGT_LF / LF22obs$eligibility_rate_LFland * LF22obs$wgt_correction)
-# sum(g22_dom$WGT_LUCAS * g22_dom$WGT_LF)
-# sum(LF22obs$WGT_LUCAS * LF22obs$WGT_LF * LF22obs$wgt_correction)
 sum(g22_dom$WGT_LF,na.rm=T)
-# [1] 100569.7
+# [1] 122349.7
 sum(LF22obs$WGT_LF * LF22obs$wgt_correction)
-# [1] 100569.7
+# [1] 122296.3
 colnames(LF22obs)[colnames(LF22obs) == "ID"] <- "POINT_ID"
 LF22obs <- LF22obs[!duplicated(LF22obs$POINT_ID),]
 
 str(LF22obs)
-write.csv(LF22obs, "LF_sample_2022_obs.csv", row.names = FALSE, quote = TRUE)
+table(LF22obs$STR25)
 
+# ---- Export calibrated LF 2022 observations --------------------------
+write.csv(LF22obs, "LF_sample_2022_obs.csv", row.names = FALSE, quote = TRUE)

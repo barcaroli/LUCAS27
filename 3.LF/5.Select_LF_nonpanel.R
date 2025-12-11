@@ -1,93 +1,115 @@
-#----------------------------------------------
-# Selection of 2027 LF sub-sample (component 2)
-#----------------------------------------------
-# Description: Selects the non-panel (component 2) portion of the
-# 2027 LF sample by filtering the master frame, excluding panel
-# units, and allocating the remaining target with PRN sampling.
-#----------------------------------------------
-# Input datasets:
-# - master_complete.RData (master frame with modeling outputs)
-# - LF2027_panel.csv (component 1 sample to be excluded)
-#----------------------------------------------
-# Output datasets:
-# - LF2027_nonpanel.csv (selected component 2 units w/ weights)
-# - LF27_ratio_by_stratum.png (diagnostic allocation plot)
-#----------------------------------------------
-# ---- Setup environment ------------------------------------------------
+###############################################################
+# Script: 5.Select_LF_nonpanel.R
+# Purpose: Select the 2027 LF non-panel (component 2) sample by
+#          filtering the frame, removing panel units, and drawing
+#          allocations via PRN ranking within strata.
+# Main steps:
+# 1) Load master frame and compute LF eligibility and strata.
+# 2) Exclude panel units and reconcile allocation with remaining strata.
+# 3) Attach allocation counts, distribute remainders, and select by PRN.
+# 4) Compute selection weights and eligibility corrections.
+# 5) Export component-2 sample and diagnostic plot.
+# Inputs:
+# - master_complete.RData
+# - LF2027_panel.csv
+# - LF_strata_with_bethel_allocation.csv
+# Outputs:
+# - LF2027_nonpanel.csv
+# - LF27_ratio_by_stratum.png
+###############################################################
+
 setwd("D:/Google Drive/LUCAS 2026/dati")
-# library(data.table)
 
 # ---- Load master frame and derive LF eligibility ---------------------
 # Read master
 load("master_complete.RData")
-# load("master_reach.RData")
-# master_tot <- merge(master_tot,m[,c("POINT_ID","reach_prob")],by="POINT_ID")
-# save(master_tot,file="master_complete.RData")
-# Frame with LF eligibility
-frame <- master_tot[(
-                    # (substr(master_tot$CLC18_R,1,1) == 2) |
-                    (master_tot$STR25 == 1 | master_tot$STR25 == 2) |
-                    (master_tot$LU11 == 1 & master_tot$STR25 == 3)) & 
-                    master_tot$reach_prob > 0.5,
-                    ]
-nrow(frame)                    
-# [1] 237573
+master_tot$STRATUM_LF <- paste(master_tot$NUTS2_24,master_tot$STR25,sep="*")
+# table(master_tot$STR25)
+# table(master_tot$STRATUM_LF)
+xtabs(~STR25+LU11pred,data=master_tot)
+
+master_tot$eligible <- ifelse((master_tot$LU11pred == 1) | (master_tot$STR25 %in% c(1,2,3))
+                         & master_tot$reach_prob > 0.5,1,0)
+master_tot$ones <- 1
+LF_tot <- aggregate(ones~STRATUM_LF,data=master_tot,FUN=sum)
+LF_eligibility <- aggregate(eligible~STRATUM_LF,data=master_tot,FUN=sum)
+LF_eligibility_rate <- merge(LF_tot,LF_eligibility,by="STRATUM_LF")
+LF_eligibility_rate$eligibility_rate_LF <- LF_eligibility_rate$eligible / LF_eligibility_rate$ones
+frame <- master_tot[master_tot$eligible==1,]
+nrow(frame)
+# [1] 404641
 
 # ---- Remove panel units and define strata ----------------------------
-# Read 2022 processed LF sub-sample
+# Read 2022 processed LF sub-sample and drop those units
 panel <- read.csv("LF2027_panel.csv",dec=".")
 nrow(panel)
 # [1] 46500
 frame <- frame[!frame$POINT_ID %in% panel$POINT_ID,]
 nrow(frame)
-# [1] 194050
-# frame$STRATUM_LF <- paste(frame$NUTS2_24,frame$LC_pred,sep="*")
-frame$STRATUM_LF <- paste(frame$NUTS2_24,frame$STR25,sep="*")
-table(frame$STRATUM_LF)
+# [1] 361667
 
 N_total <- nrow(frame)
 target_total <- 93000-nrow(panel)
 target_total
 
+# ---- Load allocation and align to remaining strata -------------------
 # Allocation per stratum (optimal, with largest remainder)
 allocation <- read.csv("LF_strata_with_bethel_allocation.csv")
-head(allocation)
+sum(allocation$nh_opt)
+# Modify allocation because some strata disappeared in frame
+allocation2 <- allocation[allocation$STRATO %in% unique(frame$STRATUM_LF),]
+sum(allocation2$nh_opt)
+set.seed(1234)
+allocation2$RN <- runif(nrow(allocation2))
+remainder <- target_total - sum(allocation2$nh_opt)
+remainder
+frame$ones <- 1
+a <- aggregate(ones~STRATUM_LF,data=frame,FUN=sum)
+a <- a[a$STRATUM_LF %in% allocation2$STRATO,]
+allocation2 <- merge(allocation2,a,by.x="STRATO",by.y="STRATUM_LF")
+allocation2$N <- allocation2$ones
+allocation2$nh_opt2 <- allocation2$nh_opt + remainder * (allocation2$nh_opt / sum(allocation2$N))
+sum(allocation2$nh_opt2)
+
+allocation2$nh_opt2 <- ifelse(allocation2$RN < 0.53,floor(allocation2$nh_opt2),ceiling(allocation2$nh_opt2))
+sum(allocation2$nh_opt2)
+allocation2$nh_opt <- ifelse(allocation2$nh_opt2 > allocation2$N,allocation2$N,allocation2$nh_opt2)
+sum(allocation2$nh_opt)
+allocation2$nh_opt2 <- NULL
+
+
+# sum(allocation2$nh_prop)
+head(allocation2)
 counts <- aggregate(list(N = rep(1L, N_total)),
                     by = list(STRATUM_LF = frame$STRATUM_LF),
                     FUN = sum)
 sum(counts$N)
-counts <- merge(counts,allocation[,c("STRATO","nh_opt","nh_prop"),],by.x="STRATUM_LF",by.y="STRATO")
+counts <- merge(counts,allocation2[,c("STRATO","nh_opt","nh_prop"),],by.x="STRATUM_LF",by.y="STRATO",all.y=TRUE)
 counts <- counts[order(counts$STRATUM_LF), ]
-counts$alloc_raw <- target_total * counts$N / N_total
-#---- Minimum number of units per stratum ---------------
-counts$min_alloc <- ifelse(counts$N >= 10L, 10L, counts$N)
-# base_alloc <- floor(counts$alloc_raw)
-# counts$frac_part <- counts$alloc_raw - base_alloc
-#--- Here we choose the optimal allocation -----
-counts$base_alloc <- counts$nh_opt
-#-----------------------------------------------
-counts$frac_part <- counts$nh_opt - counts$base_alloc
-counts$alloc <- pmax(counts$base_alloc, counts$min_alloc)
-counts$alloc <- pmin(counts$alloc, counts$N)
+counts$alloc <- counts$nh_opt
+sum(counts$alloc)
 rem <- target_total - sum(counts$alloc)
 if (rem > 0L) {
-  order_idx <- order(-counts$frac_part, counts$STRATUM_LF)
+  # order_idx <- order(-counts$frac_part, counts$STRATUM_LF)
+  order_idx <- order(counts$STRATUM_LF)
   for (i in order_idx) {
     if (rem == 0L) break
     if (counts$alloc[i] < counts$N[i]) {
       counts$alloc[i] <- counts$alloc[i] + 1L
       rem <- rem - 1L
+      cat("\nrem: ",rem)
     }
   }
 }
 if (rem < 0L) {
-  order_idx <- order(counts$frac_part, counts$STRATUM_LF)
+  # order_idx <- order(counts$frac_part, counts$STRATUM_LF)
+  order_idx <- order(counts$STRATUM_LF)
   for (i in order_idx) {
     if (rem == 0L) break
-    if (counts$alloc[i] > counts$min_alloc[i]) {
+    # if (counts$alloc[i] > counts$min_alloc[i]) {
       counts$alloc[i] <- counts$alloc[i] - 1L
       rem <- rem + 1L
-    }
+    # }
   }
 }
 stopifnot(rem == 0L)
@@ -97,23 +119,29 @@ counts$min_alloc <- NULL
 
 sum(counts$alloc)
 
-# ---- Randomize within strata and select allocated units --------------
-# Random priority within stratum
-
-
+# ---- Within strata select allocated units ----------------------------
 # Join allocation to rows
 counts_sub <- counts[, c("STRATUM_LF", "N", "alloc")]
 sum(counts_sub$alloc)
-selected <- merge(frame, counts_sub, by = "STRATUM_LF", all.x = TRUE)
 
+# selected <- merge(frame, counts_sub, by = "STRATUM_LF", all.x = TRUE)
+selected <- merge(frame, counts_sub, by = "STRATUM_LF")
+length(unique(selected$PRN))
 # Rank within stratum by PRN (descending) and select top alloc per stratum
 selected$rank_in_stratum <- ave(selected$PRN, selected$STRATUM_LF,
                                 FUN = function(x) rank(-x, ties.method = "first"))
 selected <- selected[selected$rank_in_stratum <= selected$alloc, ]
-
+selected <- selected[!duplicated(selected$POINT_ID),]
+length(unique(selected$STRATUM_LF))
 selected$ones <- 1
 a <- aggregate(ones ~ STRATUM_LF,FUN=sum,data=selected)
-a <- merge(a,allocation[,c("STRATO","nh_opt")],by.x="STRATUM_LF",by.y="STRATO")
+a <- merge(a,allocation[,c("STRATO","nh_opt")],by.x="STRATUM_LF",by.y="STRATO",all.x=TRUE)
+a <- merge(a,counts_sub,by="STRATUM_LF")
+b <- a[a$ones != a$alloc,]
+sum(a$ones)
+sum(a$nh_opt)
+sum(a$alloc)
+
 sum(a$ones)
 sum(a$nh_opt)
 
@@ -121,6 +149,9 @@ sum(a$nh_opt)
 # Weights
 selected$wgt_selection_total <- N_total / target_total
 selected$wgt_selection_stratum <- selected$N / selected$alloc
+
+sum(selected$wgt_selection_total)
+sum(selected$wgt_selection_stratum)
 
 # Verification
 ver_sel <- aggregate(list(selected_n = rep(1L, nrow(selected))),
@@ -138,6 +169,8 @@ cat("Allocation matches selection by stratum:", all(ver_check$alloc == ver_check
 stopifnot(sum(counts$alloc) == target_total)
 stopifnot(all(ver_check$alloc == ver_check$selected_n))
 
+selected <- merge(selected,LF_eligibility_rate[,c("STRATUM_LF","eligibility_rate_LF")],by="STRATUM_LF")
+
 samp <- NULL
 samp$POINT_ID <- selected$POINT_ID
 samp$module <- "LF"
@@ -145,11 +178,11 @@ samp$component <- "nonpanel"
 samp$NUTS2 <- selected$NUTS2_24
 samp$LC_pred <- selected$LC_pred
 samp$STR25 <- selected$STR25
-samp$WGT_LUCAS <- 1
-samp$WGT_comp <- selected$wgt_selection_stratum
-samp$eligibility_comp <- NA
-samp$wgt_correction <- 1
-samp$wgt_selection <- 1
+samp$WGT_LUCAS <- 1 
+samp$eligibility_comp <- selected$eligibility_rate_LF
+samp$wgt_module_22 <- 1
+samp$wgt_correction_22 <- 1
+samp$WGT_comp_27 <- selected$wgt_selection_stratum
 samp <- as.data.frame(samp)
 
 # ---- Persist selection and diagnostic plot ---------------------------

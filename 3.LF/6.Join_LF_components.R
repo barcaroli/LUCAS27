@@ -4,6 +4,10 @@
 # Description: Combines the component 1 (panel) and component 2
 # (non-panel) selections into a unified LF 2027 sample with the
 # required weights and identifiers.
+# Main steps:
+# 1) Load the panel and non-panel component files.
+# 2) Stack components and drop duplicates.
+# 3) Export the unified LF 2027 sample.
 #---------------------------
 # Input datasets:
 # - LF2027_panel.csv (component 1 sample)
@@ -24,7 +28,7 @@ comp2 <- read.csv("LF2027_nonpanel.csv")
 samp <- rbind(comp1,comp2)
 samp <- samp[!duplicated(samp$POINT_ID),]
 
-write.table(samp,"LF2027_sample_STR25.csv",sep=",",quote=F,row.names=F)
+write.table(samp,"LF2027_sample.csv",sep=",",quote=F,row.names=F)
 
 
 

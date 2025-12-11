@@ -4,6 +4,12 @@
 # Description: Builds a supervised learning model (random forest)
 # to predict LU11 membership for every unit in the LUCAS master
 # frame as an eligibility proxy for Landscape Features analysis.
+# Main steps:
+# 1) Load master frame and labelled survey data.
+# 2) Prepare training/testing samples for LU11.
+# 3) Train random forest classifier and inspect importance.
+# 4) Score the master frame and flag LF eligibility.
+# 5) Export model and updated master with LU11 predictions.
 #----------------------------------------------------------
 # Input datasets:
 # - master_complete.RData  (master frame with explanatory vars)
@@ -33,19 +39,11 @@ table(s$LU)
 s$LU11 <- ifelse(s$SURVEY_LU1 == "U111" | s$SURVEY_LU1 == "U112" | s$SURVEY_LU1 == "U113",1,0)
 s$LU11 <- as.factor(s$LU11)
 table(s$LU11)
-# s <- s[rep(row.names(s), round(s$cal_wgt/4)), ]
+
 # Merge
 sm <- merge(master_tot,s[,c("POINT_ID","LU","LU11")])
-# sm$ELEV <- ifelse(sm$ELEV < 0,0,sm$ELEV)
 sm <- sm[,c("POINT_ID","LU11",esplicative)]
 sm <- sm[complete.cases(sm),]
-
-summary(sm)
-
-
-# sm$NUTS0_16 <- factor(sm$NUTS0_16)
-# split_levels<-levels(sm$NUTS0_16)
-# split_levels
 
 # ---- Create train/test split -----------------------------------------
 set.seed(4321)
@@ -54,9 +52,6 @@ train<- sm[t1,]
 prop.table(table(train$LU11))
 test <- sm[-t1,]
 prop.table(table(test$LU11))
-
-# train <- test[complete.cases(train),]
-# test <- test[complete.cases(test),]
 
 # ---- Train random forest classifier ----------------------------------
 set.seed(1234)

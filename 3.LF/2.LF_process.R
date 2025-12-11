@@ -1,32 +1,28 @@
-## Lucas LF processing
-## This script:
-## 1) Loads master and LF datasets and keeps only effective LF points.
-## 2) Filters the LF frame by land cover/stratum conditions.
-## 3) Derives the R index per point as the share of LF groups (out of 41) that contain at least one LF code (W,G,T,D,P,S,C).
-## 4) Merges the LF frame with the LF sample to attach weights and stratum info.
-## 5) Builds the correction factor per stratum, computes final weights, and produces weighted summaries of R by NUTS2 and by stratum.
-
-# setwd("D:/Google Drive/LUCAS 2026/Procedure_STR25/3.LF/data")
+###############################################################
+# Script: 2.LF_process.R
+# Purpose: Process the 2022 observed LF sample to build LF
+#          indicators (R, F), compute final weights, and
+#          summarize by LF stratum for allocation.
+# Main steps:
+# 1) Load observed LF data and master attributes.
+# 2) Build LF presence flags across 41 groups and compute R/F.
+# 3) Prepare weights for analysis (currently placeholder=1).
+# 4) Compute weighted means and standard deviations by stratum.
+# 5) Export stratum-level statistics for allocation.
+# Inputs:
+# - Lucas_LF_2022.csv
+# - LF_sample_2022_obs.csv
+# Outputs:
+# - LF_stratum_stats.csv
+###############################################################
 setwd("D:/Google Drive/LUCAS 2026/dati")
 library(openxlsx)
 
-## 1. Load datasets -----------------------------------------------------------
-
-# load("master_complete.RData")
-
 lucas_lf <- read.csv("Lucas_LF_2022.csv",stringsAsFactors = FALSE)
-# lucas_lf <- merge(lucas_lf,master_tot[,c("POINT_ID","STR25","LC_pred","LU11pred","NUTS2_24")])
-
-# eff <- read.xlsx("effective_points_modules.xlsx")
-# lucas_lf <- lucas_lf[lucas_lf$POINT_ID %in% eff$POINT_ID_LF[!is.na(eff$POINT_ID_LF)],]
-# 
-# lucas_lf <- lucas_lf[(lucas_lf$LU11pred == 1 & lucas_lf$STR25 == 3) | (lucas_lf$STR25 %in% c(1,2)),]
-# table(lucas_lf$STR25,lucas_lf$LU11pred)
-
 lf_samp  <- read.csv("LF_sample_2022_obs.csv",stringsAsFactors = FALSE)
 lucas_lf <- merge(lf_samp[,c("POINT_ID","STR25","LC_pred","NUTS2_24","WGT_LUCAS","WGT_LF","wgt_correction")],lucas_lf,by="POINT_ID")
 
-## 2. Transform frame: compute R index ---------------------------------------
+# ---- Compute LF indicators R and F -----------------------------------
 
 ## columns containing the 41 LF observations
 lf_cols   <- grep("FEATURE", names(lucas_lf), value = TRUE)
@@ -49,36 +45,7 @@ group_flags <- sapply(group_cols, function(cols) {
 lucas_lf$R <- rowSums(group_flags, na.rm = TRUE) / num_groups
 lucas_lf$F <- ifelse(lucas_lf$R > 0, 1, 0)
 
-# ## 3. Merge frame with sample (POINT_ID = ID) --------------------------------
-# 
-# # dat <- merge(lucas_lf, lf_samp,
-# #              by.x = "POINT_ID",
-# #              by.y = "ID",
-# #              all.x = FALSE,   # keep only points present in the LF sample
-# #              all.y = FALSE)
-# dat <- lucas_lf
-# 
-# ## 4. Correction factor for WGT_LF -------------------------------------------
-# ## correttore_h = N_points_stratum_h (2nd dataset) / N_total_points (1st dataset)
-# 
-# ## total number of points in the first dataset
-# N_tot_frame <- table(lf_samp$STRATUM_LF)
-# 
-# ## count of LF sample points by STRATUM_LF
-# N_sample_by_stratum <- table(dat$STRATUM_LF)
-# 
-# ## correction vector by stratum
-# correttore_vec <- N_tot_frame / N_sample_by_stratum
-# names(correttore_vec) <- names(N_sample_by_stratum)
-# correttore_vec
-# 
-# ## assign the correction factor to each record (via STRATUM_LF)
-# dat$CORRETT_LF <- correttore_vec[ dat$STRATUM_LF ]
-# 
-# ## if any stratum is missing a correction (NA), set to 0 or 1 per logic
-# dat$CORRETT_LF[is.na(dat$CORRETT_LF)] <- 0
-
-## 5. Final weight WGT_FINAL --------------------------------------------------
+# ---- Prepare weights -------------------------------------------------
 dat <- lucas_lf
 ## ensure weights are numeric
 dat$WGT_LUCAS <- as.numeric(dat$WGT_LUCAS)
@@ -87,29 +54,19 @@ dat$WGT_LF    <- as.numeric(dat$WGT_LF)
 # dat$WGT_FINAL <- dat$WGT_LUCAS * dat$WGT_LF * dat$wgt_correction
 dat$WGT_FINAL <- 1
 
-## 6. Weighted mean of R by NUTS2_16 -----------------------------------------
+dat$STRATUM <- paste(dat$NUTS2_24,dat$STR25,sep="*")
+
+# ---- Weighted summaries by stratum ----------------------------------
 
 agg_R <- aggregate(cbind(R_w = R * WGT_FINAL,
-                         W = WGT_FINAL) ~ NUTS2_24,
+                         W = WGT_FINAL) ~ STRATUM,
                    data = dat,
                    FUN = sum,
                    na.rm = TRUE)
 
 agg_R$R_mean <- ifelse(agg_R$W > 0, agg_R$R_w / agg_R$W, NA_real_)
 
-## final table with weighted mean of R per NUTS2_16
-res_perc <- agg_R[, c("NUTS2_24", "R_mean")]
-
-print(res_perc)
-
-## ===============================================================
-## 7. Output by STRATUM_LF:
-##    - N = sum of WGT_FINAL
-##    - weighted mean of R
-##    - weighted standard deviation (SQM) of R
-## ===============================================================
-
-dat$STRATUM <- paste(dat$NUTS2_24,dat$STR25,sep="*")
+res_perc <- agg_R[, c("STRATUM", "R_mean")]
 
 strata <- sort(unique(dat$STRATUM))
 
@@ -154,14 +111,9 @@ stratum_stats <- do.call(rbind, stratum_stats_list)
 sum(stratum_stats$N)
 
 ## print result
-print(stratum_stats)
+head(stratum_stats)
 
-## save to file
+# ---- Export stratum-level stats -------------------------------------
 write.csv(stratum_stats,
           file = "LF_stratum_stats.csv",
           row.names = FALSE)
-
-# write.xlsx(stratum_stats,
-#            file = "LF_stratum_stats.xlsx",
-#            sheetName = "stats",
-#            rowNames = FALSE)
