@@ -43,10 +43,10 @@ sum(LF$WGT_LUCAS[LF$component=="nonpanel"]*
 # boxplot(wgt_correction_22~component,data=LF)
 # boxplot(WGT_comp_27~component,data=LF)
 
-LF$STRATUM_LF <- paste(LF$NUTS2,LF$STR25,sep="*")
-frame$STRATUM_LF <- paste(frame$NUTS2_24,frame$STR25,sep="*")
+LF$STRATUM <- paste(LF$NUTS2,LF$STR25,sep="*")
+frame$STRATUM <- paste(frame$NUTS2_24,frame$STR25,sep="*")
 frame$ones <- 1
-frame_totals <- aggregate(ones~STRATUM_LF,data=frame,FUN=sum)
+frame_totals <- aggregate(ones~STRATUM,data=frame,FUN=sum)
 sum(frame_totals$ones)
 # [1] 434155
 #--------------------------------------------------------
@@ -61,11 +61,11 @@ sum(panel$WGT_LF)
 # [1] 477565.2
 sum(frame_totals$ones)
 # [1] 434155
-sample_totals <- aggregate(WGT_LF~STRATUM_LF,data=panel,FUN=sum)
-correction <- merge(frame_totals,sample_totals,by="STRATUM_LF")
+sample_totals <- aggregate(WGT_LF~STRATUM,data=panel,FUN=sum)
+correction <- merge(frame_totals,sample_totals,by="STRATUM")
 correction$correction_factor <- correction$ones / correction$WGT_LF
 # Here there is all.x=TRUE because some strata in panel are not present in correction
-panel <- merge(panel,correction[,c("STRATUM_LF","correction_factor")],all.x=TRUE)
+panel <- merge(panel,correction[,c("STRATUM","correction_factor")],all.x=TRUE)
 panel$correction_factor[is.na(panel$correction_factor)] <- 1
 summary(panel$correction_factor)
 panel$WGT_panel <- panel$WGT_LF * panel$correction_factor
@@ -88,10 +88,10 @@ sum(nonpanel$WGT_LF)
 # [1] 453979.3
 sum(frame_totals$ones)
 # [1] 434155
-sample_totals <- aggregate(WGT_LF~STRATUM_LF,data=nonpanel,FUN=sum)
-correction <- merge(frame_totals,sample_totals,by="STRATUM_LF")
+sample_totals <- aggregate(WGT_LF~STRATUM,data=nonpanel,FUN=sum)
+correction <- merge(frame_totals,sample_totals,by="STRATUM")
 correction$correction_factor <- correction$ones / correction$WGT_LF
-nonpanel <- merge(nonpanel,correction[,c("STRATUM_LF","correction_factor")])
+nonpanel <- merge(nonpanel,correction[,c("STRATUM","correction_factor")])
 nonpanel$WGT_nonpanel <- nonpanel$WGT_LF * nonpanel$correction_factor
 sum(nonpanel$WGT_nonpanel)
 #  433362
@@ -103,15 +103,15 @@ colnames(nonpanel)[colnames(nonpanel)=="WGT_nonpanel"] <- "WGT_LF"
 LF <- rbind(panel,nonpanel)
 sum(LF$WGT_LF)
 # [1] 866982.6
-sample_totals <- aggregate(WGT_LF~STRATUM_LF,data=LF,FUN=sum)
-correction <- merge(frame_totals,sample_totals,by="STRATUM_LF")
+sample_totals <- aggregate(WGT_LF~STRATUM,data=LF,FUN=sum)
+correction <- merge(frame_totals,sample_totals,by="STRATUM")
 correction$correction_factor <- correction$ones / correction$WGT_LF
-LF <- merge(LF,correction[,c("STRATUM_LF","correction_factor")],all.x=TRUE)
+LF <- merge(LF,correction[,c("STRATUM","correction_factor")],all.x=TRUE)
 LF$correction_factor[is.na(LF$correction_factor)] <- 1
-LF$WGT_module_27 <- LF$WGT_LF * LF$correction_factor 
+LF$WGT_module_27 <- LF$WGT_LF * LF$correction_factor
 sum(LF$WGT_module_27)
 # [1] 433620.6
-LF$WGT_LF <- LF$correction_factor <- NULL
+LF$WGT_LF <- LF$correction_factor <- LF$STRATUM_LF <- NULL
 
 
 write.table(LF,"LF2027_sample.csv",sep=",",quote=F,row.names=F)
