@@ -108,7 +108,7 @@ correction <- merge(frame_totals,sample_totals,by="STRATUM_LF")
 correction$correction_factor <- correction$ones / correction$WGT_LF
 LF <- merge(LF,correction[,c("STRATUM_LF","correction_factor")],all.x=TRUE)
 LF$correction_factor[is.na(LF$correction_factor)] <- 1
-LF$WGT_module_27 <- LF$WGT_LF * LF$correction_factor
+LF$WGT_module_27 <- LF$WGT_LF * LF$correction_factor 
 sum(LF$WGT_module_27)
 # [1] 433620.6
 LF$WGT_LF <- LF$correction_factor <- NULL
