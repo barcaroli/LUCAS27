@@ -79,7 +79,7 @@ soil_sample$WGT_SOIL_LC <- as.numeric(master_LC[soil_sample$STRATUM_LC]) /
   as.numeric(soil_LC[soil_sample$STRATUM_LC])
 
 samp <- NULL
-samp$STRATUM <- paste(soil_sample$NUTS2_24,soil_sample$STR25)
+samp$STRATUM <- paste(soil_sample$NUTS2_24,soil_sample$STR25,sep="*")
 samp$POINT_ID <- soil_sample$POINT_ID
 samp$module <- "SOIL"
 samp$component <- ""
@@ -88,7 +88,7 @@ samp$LC_pred <- soil_sample$LC_pred
 samp$STR25 <- soil_sample$STR25
 samp$WGT_LUCAS <- soil_sample$WGT_LUCAS 
 samp$eligibility_comp <- ""
-samp$WGT_module_22 <- 1
+samp$wgt_module_22 <- 1
 samp$wgt_correction_22 <- 1
 samp$WGT_comp_27 <- 1
 samp$WGT_module_27 <- soil_sample$WGT_SOIL_LC

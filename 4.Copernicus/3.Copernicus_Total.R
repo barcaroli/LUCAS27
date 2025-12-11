@@ -1,13 +1,23 @@
 # ================================================================
-# Script: 3.check.R
-# Description: consolidates the thematic samples (Soil, Grassland, LF,
-#              Copernicus) and compares their LC1 mix with master_tot
-#              LC_pred through quick tabulations and a barplot.
-# Input: Soil2027_sample.csv, Grassland2027_sample.csv,
-#        LF2027_sample.csv, Copernicus2027_sample.csv,
-#        master_complete.RData
-# Output: LC distribution tabulations printed to console and barplot
-#         visualisation on screen (no files written)
+# General purpose
+# - Consolidate thematic samples (Soil, Grassland, LF, Copernicus) into a single dataset
+# - Deduplicate by POINT_ID and write the final sample and total files
+# - Compare LC and NUTS0 distributions of the sample against master_tot
+#
+# Input datasets
+# - master_complete.RData (object master_tot with LC_pred and coordinates)
+# - Soil2027_sample.csv, Grassland2027_sample.csv, LF2027_sample.csv,
+#   Copernicus2027_sample_add.csv
+#
+# Outputs
+# - Copernicus2027_sample.csv, LUCAS2027_total_modules.csv
+# - LC_distribution_tot_vs_master.png, NUTS0_distribution_tot_vs_master.png
+# - Control tabulations printed to console and interactive maps via mapview
+#
+# Main steps
+# - Harmonize weights for Grassland, bind samples, and deduplicate on POINT_ID
+# - Compute module overlaps and LC/NUTS0 percentage distributions
+# - Barplots (sample vs master) and module visualization on map
 # ================================================================
 library(data.table)
 library(sf)
@@ -22,25 +32,34 @@ Soil <- read.csv("Soil2027_sample.csv")
 a <- Soil[!Soil$POINT_ID %in% master_tot$POINT_ID,]
 Soil <- Soil[Soil$POINT_ID %in% master_tot$POINT_ID,]
 Grass <- read.csv("Grassland2027_sample.csv")
-b <- Grass[!Grass$POINT_ID %in% master_tot$POINT_ID,] 
+# b <- Grass[!Grass$POINT_ID %in% master_tot$POINT_ID,] 
 LF <- read.csv("LF2027_sample.csv")
-c <- LF[!LF$POINT_ID %in% master_tot$POINT_ID,] 
+
+# c <- LF[!LF$POINT_ID %in% master_tot$POINT_ID,] 
 LF <- LF[LF$POINT_ID %in% master_tot$POINT_ID,]
 Copernicus_add <- read.csv("Copernicus2027_sample_add.csv")
 
-
+#--- Temporary treatment for Grassland ------
+Grass$STRATUM <- paste(Grass$NUTS2,Grass$STR25,sep="*")
+Grass$WGT_module_27 <- Grass$wgt_selection
+colnames(Grass)[colnames(Grass)=="wgt_correction"] <- "wgt_correction_22"
+colnames(Grass)[colnames(Grass)=="WGT_comp"] <- "WGT_comp_27"
+colnames(Grass)[colnames(Grass)=="wgt_selection"] <- "wgt_module_22"
+Grass$WGT_module_27 <- Grass$wgt_module_22
+# TO BE CANCELED!!!
+#--------------------------------------------
 tot <- rbind(Soil,Grass,LF,Copernicus_add)
 Copernicus <- tot[!duplicated(tot$POINT_ID),]
 write.table(Copernicus,"Copernicus2027_sample.csv",sep=",",quote=F,row.names=F)
 
-write.table(tot,"LUCAS2027_total_sample.csv",sep=",",quote=F,row.names=F)
+write.table(tot,"LUCAS2027_total_modules.csv",sep=",",quote=F,row.names=F)
 xtabs(~module,data=tot)
 # Copernicus  GRASSLAND         LF       SOIL 
-#       5160      20000      93001      25000 
+#       6442      20000      93000      24987  
 
 dt <- as.data.table(tot)
 
-
+names(Grass)[!names(Grass) %in% names(Soil)]
 
 mods_by_id <- dt[, .(modules = list(unique(module))), by = POINT_ID]
 mods_by_id[, combo := sapply(modules, function(x) paste(sort(x), collapse = "+"))]
@@ -111,17 +130,21 @@ render_barplot <- function(mat, cats, title, legend_labels, colors, filename = N
   }
 }
 
-cats <- sort(unique(c(levels(factor(tot2$LC_pred)), levels(factor(master_tot$LC_pred)))))
+lc_sample_col <- if ("LC1" %in% names(tot2)) "LC1" else "LC_pred"
+lc_sample <- tot2[[lc_sample_col]]
+cats <- sort(unique(c(levels(factor(lc_sample)), levels(factor(master_tot$LC_pred)))))
 
-perc_tot    <- as.numeric(100 * prop.table(table(factor(tot2$LC_pred,        levels = cats))))
+perc_sample <- as.numeric(100 * prop.table(table(factor(lc_sample,levels = cats))))
 perc_master <- as.numeric(100 * prop.table(table(factor(master_tot$LC_pred, levels = cats))))
 
- M <- rbind(`Sample (LC1)` = perc_tot, `Master (LC_pred)` = perc_master)
+lc_labels <- c(sprintf("Sample (%s)", lc_sample_col), "Master (LC_pred)")
+M <- rbind(`Campione` = perc_sample, `Master` = perc_master)
 render_barplot(M, cats,
-               title = "LC1 (sample) vs LC_pred (master): percentages",
-               legend_labels = c("Sample (LC1)", "Master (LC_pred)"),
-               colors = c("blue", "red"),
-               filename = "LC_distribution_tot_vs_master.png")
+               title = sprintf("LandCover distribution: sample (%s) vs master (LC_pred)", lc_sample_col),
+               legend_labels = lc_labels,
+               colors = c("steelblue", "firebrick"),
+               filename = "LC_distribution_tot_vs_master.png",
+               mar = c(12, 5, 4, 1))
 
 # ---- Visual comparison of NUTS0 distributions ----
 # NUTS0 derived as the first two characters of NUTS2
@@ -147,14 +170,13 @@ nuts0_levels <- sort(unique(c(levels(factor(master_nuts0)), levels(factor(tot2_n
 perc_tot_nuts0 <- as.numeric(100 * prop.table(table(factor(tot2_nuts0,    levels = nuts0_levels))))
 perc_master_nuts0 <- as.numeric(100 * prop.table(table(factor(master_nuts0, levels = nuts0_levels))))
 
-M_nuts0 <- rbind(`Sample (NUTS0)` = perc_tot_nuts0, `Master (NUTS0)` = perc_master_nuts0)
+M_nuts0 <- rbind(`Campione` = perc_tot_nuts0, `Master` = perc_master_nuts0)
 render_barplot(M_nuts0, nuts0_levels,
-               title = "NUTS0 (sample) vs NUTS0 (master): percentages",
-               legend_labels = c("Sample (NUTS0)", "Master (NUTS0)"),
+               title = "NUTS0 distribution: sample vs master",
+               legend_labels = c("Sample", "Master"),
                colors = c("darkgreen", "orange"),
                filename = "NUTS0_distribution_tot_vs_master.png",
                mar = c(7, 4, 3, 1))
-
 tot2$NUTS0 <- substr(tot2$NUTS2,1,2)
 addmargins(xtabs(~module+NUTS0,data=tot2))
 # ---- Mappa interattiva  ----
@@ -185,7 +207,7 @@ mapview(LF,
         zcol="LC_pred", 
         map.types = c("Esri.WorldStreetMap"),
         cex=2)
-Copernicus <- tot_with_coords[tot_with_coords$module=="Copernicus",]
+Copernicus <- tot_with_coords[tot_with_coords$module=="Copernicus_add",]
 mapview(Copernicus,
         zcol="LC_pred", 
         map.types = c("Esri.WorldStreetMap"),

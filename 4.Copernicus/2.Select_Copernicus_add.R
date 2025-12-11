@@ -57,6 +57,8 @@ if (exists("already_selected")) {
 
 master_avail <- master_df[!(master_df$POINT_ID %in% exclusion_ids), ]
 master_avail$STRATUM <- paste(master_avail$NUTS2_24, master_avail$STR25, sep = "*")
+nrow(master_avail)
+# [1] 904822
 
 # ---- Standardise allocation table columns ----
 # Standardize new_points columns
@@ -194,7 +196,7 @@ print(data.frame(LC_pred = names(req), requested = as.integer(req),
                  selected = as.integer(sel[names(req)]), row.names = NULL))
 
 cat("\nSelected counts by LC_pred x STRATUM (NUTS2_24*STR25):\n")
-print(table(copernicus_selected$LC_pred, copernicus_selected$STRATUM))
+# print(table(copernicus_selected$LC_pred, copernicus_selected$STRATUM))
 
 cat("\nSampling rate per LC_pred x STRATUM (NUTS2_24*STR25) (plot saved to sampling_rate_by_stratum.png):\n")
 avail_counts <- as.data.frame(table(master_avail$LC_pred, master_avail$STRATUM))
@@ -206,6 +208,9 @@ strata_summary$available[is.na(strata_summary$available)] <- 0L
 strata_summary$selected[is.na(strata_summary$selected)] <- 0L
 strata_summary$sampling_rate <- ifelse(strata_summary$available > 0, strata_summary$selected / strata_summary$available, 0)
 strata_summary$stratum <- paste(strata_summary$LC_pred, strata_summary$STRATUM, sep = "*")
+total_avail_in_selected_strata <- sum(strata_summary$available[strata_summary$selected > 0], na.rm = TRUE)
+cat("\nTotal units in master_avail for strata where at least one unit was selected: ",
+    total_avail_in_selected_strata, "\n", sep = "")
 if (nrow(strata_summary) > 0) {
   strata_parts <- do.call(
     rbind,
@@ -220,7 +225,7 @@ if (nrow(strata_summary) > 0) {
   strata_summary$NUTS2_24 <- character(0)
   strata_summary$STR25 <- character(0)
 }
-print(strata_summary[, c("LC_pred","NUTS2_24","STR25","available","selected","sampling_rate")])
+# print(strata_summary[, c("LC_pred","NUTS2_24","STR25","available","selected","sampling_rate")])
 
 if (nrow(strata_summary) > 0) {
   png("Copernicus_sampling_rate_by_stratum.png", width = 1600, height = 900, res = 150)
@@ -234,33 +239,23 @@ if (nrow(strata_summary) > 0) {
   abline(h = 0, col = "gray40")
   dev.off()
 }
-
-# copernicus_selected_b <- NULL
-# copernicus_selected_b$POINT_ID <- copernicus_selected$POINT_ID
-# copernicus_selected_b$component <- ""
-# copernicus_selected_b$STRATUM <- paste(copernicus_selected$LC_pred,copernicus_selected$NUTS0_24,sep="*")
-# copernicus_selected_b$WGT_LUCAS <- ""
-# copernicus_selected_b$WGT_comp <- 1
-# copernicus_selected_b$eligibility_comp <- 1
-# copernicus_selected_b$LC1 <- copernicus_selected$LC_pred
-# copernicus_selected_b$wgt_correction <- 1
-# copernicus_selected_b$wgt_selection <- copernicus_selected$weight_copernicus
-# copernicus_selected_b <- as.data.frame(copernicus_selected_b)
-
+sum(copernicus_selected$weight_copernicus)
+# [1] 81663
 # Write output and print summaries
 samp <- NULL
+samp$STRATUM <- paste(copernicus_selected$NUTS2_24,copernicus_selected$STR25,sep="*")
 samp$POINT_ID <- copernicus_selected$POINT_ID
-samp$module <- "Copernicus"
+samp$module <- "Copernicus_add"
 samp$component <- ""
 samp$NUTS2 <- copernicus_selected$NUTS2_24
 samp$LC_pred <- copernicus_selected$LC_pred
 samp$STR25 <- copernicus_selected$STR25
-# samp$STRATUM <- paste(samp$NUTS2, samp$STR25, sep = "*")
-samp$WGT_LUCAS <- 1
-samp$WGT_comp <- 1
-samp$eligibility_comp <- NA
-samp$wgt_correction <- 1
-samp$wgt_selection <- copernicus_selected$weight_copernicus
+samp$WGT_LUCAS <- 1 
+samp$eligibility_comp <- 1
+samp$wgt_module_22 <-  1
+samp$wgt_correction_22 <- 1
+samp$WGT_comp_27 <- 1
+samp$WGT_module_27 <- copernicus_selected$weight_copernicus
 samp <- as.data.frame(samp)
 
 # Write the additional points needed by Copernicus
@@ -272,6 +267,5 @@ sel <- table(copernicus_selected$LC_pred)
 print(data.frame(LC_pred = names(req), requested = as.integer(req),
                  selected = as.integer(sel[names(req)]), row.names = NULL))
 
-cat("\nSelected counts by LC_pred x STRATUM (NUTS2_24*STR25):\n")
-print(table(copernicus_selected$LC_pred, copernicus_selected$STRATUM))
-
+# cat("\nSelected counts by LC_pred x STRATUM (NUTS2_24*STR25):\n")
+# print(table(copernicus_selected$LC_pred, copernicus_selected$STRATUM))

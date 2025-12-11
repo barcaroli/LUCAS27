@@ -48,7 +48,13 @@ Grass <- read.csv("Grassland2027_sample.csv")
 b <- Grass[is.na(Grass$NUTS2),]
 LF <- read.csv("LF2027_sample.csv")
 c <- LF[is.na(LF$NUTS2),]
-
+#--- Temporary treatment for Grassland ------
+Grass$STRATUM <- paste(Grass$NUTS2,Grass$STR25,sep="*")
+Grass$WGT_module_27 <- Grass$wgt_selection
+colnames(Grass)[colnames(Grass)=="wgt_correction"] <- "wgt_correction_22"
+colnames(Grass)[colnames(Grass)=="WGT_comp"] <- "WGT_comp_27"
+colnames(Grass)[colnames(Grass)=="wgt_selection"] <- "wgt_module_22"
+Grass$WGT_module_27 <- Grass$wgt_module_22
 
 tot <- rbind(Soil,Grass,LF)
 
@@ -59,7 +65,7 @@ write.table(tot,"points_selected_in_Soil_Grassland_LF.csv",sep=",",quote=F,row.n
 
 remaining <- 130000 - nrow(tot)
 remaining
-# [1] 5321
+# [1] 6442
 
 load("master_complete.RData")
 
