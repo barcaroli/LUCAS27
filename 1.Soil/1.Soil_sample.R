@@ -4,7 +4,7 @@
 #   - List of points to be selected: lucas2027_soil.xlsx 
 #   - Master dataset
 # Output:
-#   - List of points to be selected enriched and in adjusted format: Soil2027_sample_STR25.csv 
+#   - List of points to be selected enriched and in adjusted format: Soil2027_sample.csv 
 # ------------------------------------------------------------------------------
 
 setwd("D:/Google Drive/LUCAS 2026/dati")
@@ -81,15 +81,15 @@ soil_sample$WGT_SOIL_LC <- as.numeric(master_LC[soil_sample$STRATUM_LC]) /
 samp <- NULL
 samp$POINT_ID <- soil_sample$POINT_ID
 samp$module <- "SOIL"
-samp$component <- "unique"
+samp$component <- ""
 samp$NUTS2 <- soil_sample$NUTS2_24
 samp$LC_pred <- soil_sample$LC_pred
 samp$STR25 <- soil_sample$STR25
 samp$WGT_LUCAS <- soil_sample$WGT_LUCAS 
-samp$WGT_comp <- 1
 samp$eligibility_comp <- ""
-samp$wgt_correction <- 1
-samp$wgt_selection <- soil_sample$WGT_SOIL_LC
+samp$WGT_module_22 <- 1
+samp$wgt_correction_22 <- 1
+samp$WGT_comp_27 <- soil_sample$WGT_SOIL_LC
 samp <- as.data.frame(samp)
 
 write.table(samp,"Soil2027_sample.csv",sep=",",quote=F,row.names=F)
