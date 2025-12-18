@@ -16,7 +16,7 @@ load("master_complete.RData")
 
 Soil <- read.csv("Soil2027_sample.csv")
 a <- Soil[!Soil$POINT_ID %in% master_tot$POINT_ID,]
-# Soil <- Soil[Soil$POINT_ID %in% master_tot$POINT_ID,]
+Soil <- Soil[Soil$POINT_ID %in% master_tot$POINT_ID,]
 Grass <- read.csv("Grassland2027_sample.csv")
 # b <- Grass[!Grass$POINT_ID %in% master_tot$POINT_ID,] 
 LF <- read.csv("LF2027_sample.csv")
