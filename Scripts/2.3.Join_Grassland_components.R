@@ -169,24 +169,57 @@ sum(samp$WGT_module_27)
 samp2 <- samp[!duplicated(samp$POINT_ID),]
 write.table(samp,"Grassland2027_sample.csv",sep=",",quote=F,row.names=F)
 
-# ---- Diagnostic barplots: sample distribution -----------------------
+# ---- Diagnostic barplots: percent distributions vs master -----------
 # NUTS0 (first 2 chars of NUTS2)
+# Colors shared across plots to distinguish sample vs master
 png("2.3.1.Grassland27_distribution_by_NUTS0.png", width = 1200, height = 800)
-nuts0_counts <- table(substr(GR$NUTS2, 1, 2))
-barplot(nuts0_counts,
-        main = "GR 2027 sample distribution by NUTS0",
+sample_nuts0 <- substr(GR$NUTS2, 1, 2)
+master_nuts0 <- substr(frame$NUTS2_24, 1, 2)
+all_nuts0 <- sort(unique(c(sample_nuts0, master_nuts0)))
+sample_nuts0_pct <- 100 * (table(factor(sample_nuts0, levels = all_nuts0)) / length(sample_nuts0))
+master_nuts0_pct <- 100 * (table(factor(master_nuts0, levels = all_nuts0)) / length(master_nuts0))
+barplot(rbind(sample_nuts0_pct, master_nuts0_pct),
+        beside = TRUE,
+        main = "GR 2027 percent distribution by NUTS0 (sample vs master)",
         xlab = "NUTS0",
-        ylab = "Number of sampled points",
-        las = 2)
+        ylab = "Percent of points",
+        las = 2,
+        legend.text = c("Sample", "Master"),
+        col = c("steelblue3", "darkorange2"),
+        args.legend = list(x = "topright", bty = "n"))
 dev.off()
+barplot(rbind(sample_nuts0_pct, master_nuts0_pct),
+        beside = TRUE,
+        main = "GR 2027 percent distribution by NUTS0 (sample vs master)",
+        xlab = "NUTS0",
+        ylab = "Percent of points",
+        las = 2,
+        legend.text = c("Sample", "Master"),
+        col = c("steelblue3", "darkorange2"),
+        args.legend = list(x = "topright", bty = "n"))
 
 # LC_pred distribution
 png("2.3.2.Grassland27_distribution_by_LCpred.png", width = 1200, height = 800)
-GRpred_counts <- table(GR$LC_pred)
-barplot(GRpred_counts,
-        main = "GR 2027 sample distribution by LC_pred",
+all_lcpred <- sort(unique(c(GR$LC_pred, frame$LC_pred)))
+sample_lcpred_pct <- 100 * (table(factor(GR$LC_pred, levels = all_lcpred)) / nrow(GR))
+master_lcpred_pct <- 100 * (table(factor(frame$LC_pred, levels = all_lcpred)) / nrow(frame))
+barplot(rbind(sample_lcpred_pct, master_lcpred_pct),
+        beside = TRUE,
+        main = "GR 2027 percent distribution by LC_pred (sample vs master)",
         xlab = "LC_pred",
-        ylab = "Number of sampled points",
-        las = 2)
+        ylab = "Percent of points",
+        las = 2,
+        legend.text = c("Sample", "Master"),
+        col = c("steelblue3", "darkorange2"),
+        args.legend = list(x = "topright", bty = "n"))
 dev.off()
+barplot(rbind(sample_lcpred_pct, master_lcpred_pct),
+        beside = TRUE,
+        main = "GR 2027 percent distribution by LC_pred (sample vs master)",
+        xlab = "LC_pred",
+        ylab = "Percent of points",
+        las = 2,
+        legend.text = c("Sample", "Master"),
+        col = c("steelblue3", "darkorange2"),
+        args.legend = list(x = "topright", bty = "n"))
 
